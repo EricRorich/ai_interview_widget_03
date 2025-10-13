@@ -7394,6 +7394,33 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
 <form method="post" action="options.php">
     <?php settings_fields('ai_interview_widget_settings'); ?>
     
+    <?php
+    // Preserve settings that are not displayed in this form
+    // These include customizer-managed settings and geolocation settings
+    $hidden_settings = array(
+        // Customizer-managed settings (managed by Enhanced Visual Customizer page)
+        'ai_interview_widget_style_settings' => 'string',
+        'ai_interview_widget_content_settings' => 'string',
+        'ai_interview_widget_custom_audio_en' => 'string',
+        'ai_interview_widget_custom_audio_de' => 'string',
+        'ai_interview_widget_design_presets' => 'string',
+        // Geolocation settings (not yet implemented in this form)
+        'ai_interview_widget_enable_geolocation' => 'boolean',
+        'ai_interview_widget_geolocation_cache_timeout' => 'integer',
+        'ai_interview_widget_geolocation_require_consent' => 'boolean',
+        'ai_interview_widget_geolocation_debug_mode' => 'boolean'
+    );
+    
+    foreach ($hidden_settings as $setting_name => $setting_type) {
+        if ($setting_type === 'boolean') {
+            $setting_value = get_option($setting_name, false) ? '1' : '0';
+        } else {
+            $setting_value = get_option($setting_name, '');
+        }
+        echo '<input type="hidden" name="' . esc_attr($setting_name) . '" value="' . esc_attr($setting_value) . '" />' . "\n";
+    }
+    ?>
+    
     <!-- API Configuration Section Header -->
     <div class="postbox" style="padding: 25px; margin-bottom: 20px;">
         <h2 style="margin: 0 0 10px 0;">⚙️ API Configuration</h2>
