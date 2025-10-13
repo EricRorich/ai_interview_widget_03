@@ -7394,6 +7394,23 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
 <form method="post" action="options.php">
     <?php settings_fields('ai_interview_widget_settings'); ?>
     
+    <?php
+    // Preserve customizer-managed settings that are not displayed in this form
+    // These settings are managed by the Enhanced Visual Customizer page
+    $customizer_settings = array(
+        'ai_interview_widget_style_settings',
+        'ai_interview_widget_content_settings',
+        'ai_interview_widget_custom_audio_en',
+        'ai_interview_widget_custom_audio_de',
+        'ai_interview_widget_design_presets'
+    );
+    
+    foreach ($customizer_settings as $setting_name) {
+        $setting_value = get_option($setting_name, '');
+        echo '<input type="hidden" name="' . esc_attr($setting_name) . '" value="' . esc_attr($setting_value) . '" />' . "\n";
+    }
+    ?>
+    
     <!-- API Configuration Section Header -->
     <div class="postbox" style="padding: 25px; margin-bottom: 20px;">
         <h2 style="margin: 0 0 10px 0;">⚙️ API Configuration</h2>
