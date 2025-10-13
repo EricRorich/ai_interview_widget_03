@@ -168,7 +168,9 @@ WordPress expects: 27 settings
 Result: MATCH → Form saves successfully, success message displays
 ```
 
-## Code Implementation (Lines 7397-7422)
+## Code Implementation
+
+Located in the `admin_page()` function in `ai_interview_widget.php`, immediately after the `settings_fields()` call:
 
 ```php
 <?php

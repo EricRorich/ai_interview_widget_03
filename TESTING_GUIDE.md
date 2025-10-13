@@ -30,7 +30,7 @@ This guide provides step-by-step instructions to test the Settings form save fun
 **If Test Fails:**
 - Check browser console for JavaScript errors
 - Check WordPress debug log for PHP errors
-- Verify all 27 settings are registered in `register_settings()` function
+- Verify all 27 settings are registered in the `register_settings()` function in `ai_interview_widget.php`
 
 ---
 
@@ -78,7 +78,7 @@ This guide provides step-by-step instructions to test the Settings form save fun
 **If Test Fails:**
 - Verify hidden fields are present in the form (View Page Source)
 - Check that `ai_interview_widget_style_settings` is in hidden fields
-- Review the hidden fields code in `ai_interview_widget.php` lines 7397-7422
+- Review the hidden fields code in the `admin_page()` function in `ai_interview_widget.php` (look for the "Preserve settings" comment)
 
 ---
 
@@ -233,8 +233,8 @@ If you encounter issues:
 
 ## Technical Reference
 
-- **Form Location**: `ai_interview_widget.php` lines 7394-7856
-- **Hidden Fields**: `ai_interview_widget.php` lines 7397-7422
-- **Settings Registration**: `ai_interview_widget.php` lines 734-1013
-- **Settings Errors Display**: `ai_interview_widget.php` line 7319
-- **Submit Button**: `ai_interview_widget.php` line 7854
+- **Form Location**: `ai_interview_widget.php` in the `admin_page()` function
+- **Hidden Fields**: Look for the "Preserve settings that are not displayed in this form" comment in `admin_page()` function
+- **Settings Registration**: `register_settings()` function in `ai_interview_widget.php`
+- **Settings Errors Display**: Look for `settings_errors()` call in the `admin_page()` function
+- **Submit Button**: Look for `submit_button()` call in the `admin_page()` function
