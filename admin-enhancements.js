@@ -475,6 +475,7 @@
                     data.action = 'ai_interview_save_provider_settings';
                     data.api_provider = $('#api_provider').val();
                     data.llm_model = $('#llm_model').val();
+                    data.max_tokens = $('#max_tokens').val();
                     break;
                     
                 case 'api-keys':

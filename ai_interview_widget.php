@@ -848,6 +848,17 @@ class AIInterviewWidget {
             )
         );
         
+        // Token Generation Limit
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_max_tokens',
+            array(
+                'type' => 'integer',
+                'sanitize_callback' => 'absint',
+                'default' => 500
+            )
+        );
+        
         register_setting(
             $settings_group,
             'ai_interview_widget_anthropic_api_key',
@@ -7457,6 +7468,10 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <th scope="row" style="color: #1565C0; font-weight: 600;">LLM Model</th>
                     <td><?php $this->llm_model_field_callback(); ?></td>
                 </tr>
+                <tr>
+                    <th scope="row" style="color: #1565C0; font-weight: 600;">Token Generation Limit</th>
+                    <td><?php $this->max_tokens_field_callback(); ?></td>
+                </tr>
             </table>
             <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
             <div style="text-align: right; margin-top: 15px;">
@@ -8048,6 +8063,26 @@ public function llm_model_field_callback() {
         }, 50);
     });
     </script>
+    <?php
+}
+
+public function max_tokens_field_callback() {
+    $max_tokens = get_option('ai_interview_widget_max_tokens', 500);
+    ?>
+    <input type="number" 
+           id="max_tokens" 
+           name="ai_interview_widget_max_tokens" 
+           value="<?php echo esc_attr($max_tokens); ?>" 
+           min="1" 
+           max="32768" 
+           step="1" 
+           class="small-text"
+           style="width: 100px;">
+    <p class="description">
+        Maximum number of tokens the AI can generate in a single response (1-32768). 
+        Typical values: 150 for brief responses, 500 for balanced responses, 1000+ for detailed responses. 
+        Note: Higher values may increase API costs and response time.
+    </p>
     <?php
 }
 
@@ -10498,6 +10533,9 @@ public function documentation_page() {
         // Get and sanitize input
         $provider = isset($_POST['api_provider']) ? sanitize_text_field($_POST['api_provider']) : '';
         $model = isset($_POST['llm_model']) ? sanitize_text_field($_POST['llm_model']) : '';
+        // Get max_tokens with validation (default to 500 if not provided)
+        $max_tokens_input = isset($_POST['max_tokens']) ? absint($_POST['max_tokens']) : 500;
+        $max_tokens = max(1, min(32768, $max_tokens_input));
         
         if (empty($provider)) {
             wp_send_json_error(array('message' => 'API provider is required'));
@@ -10509,11 +10547,13 @@ public function documentation_page() {
         if (!empty($model)) {
             update_option('ai_interview_widget_llm_model', $model);
         }
+        update_option('ai_interview_widget_max_tokens', $max_tokens);
         
         wp_send_json_success(array(
             'message' => 'AI Provider settings saved successfully!',
             'provider' => $provider,
-            'model' => $model
+            'model' => $model,
+            'max_tokens' => $max_tokens
         ));
     }
     
