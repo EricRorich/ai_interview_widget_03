@@ -443,6 +443,131 @@
     // Initialize when DOM is ready
     $(document).ready(function() {
         initializeAdminEnhancements();
+        initializeSectionSaveButtons();
     });
+    
+    /**
+     * Initialize section-specific save buttons
+     */
+    function initializeSectionSaveButtons() {
+        $('.aiw-save-section').on('click', function() {
+            const button = $(this);
+            const section = button.data('section');
+            const sectionDiv = button.closest('.aiw-settings-section');
+            const messageDiv = sectionDiv.find('.aiw-section-message');
+            
+            // Disable button and show loading state
+            button.prop('disabled', true);
+            button.find('.button-text').hide();
+            button.find('.button-spinner').show();
+            
+            // Clear previous messages
+            messageDiv.hide().removeClass('notice-success notice-error');
+            
+            // Prepare data based on section
+            let data = {
+                action: '',
+                nonce: aiwAdmin.nonce
+            };
+            
+            switch(section) {
+                case 'provider':
+                    data.action = 'ai_interview_save_provider_settings';
+                    data.api_provider = $('#api_provider').val();
+                    data.llm_model = $('#llm_model').val();
+                    break;
+                    
+                case 'api-keys':
+                    data.action = 'ai_interview_save_api_keys';
+                    data.openai_api_key = $('input[name="ai_interview_widget_openai_api_key"]').val();
+                    data.anthropic_api_key = $('input[name="ai_interview_widget_anthropic_api_key"]').val();
+                    data.gemini_api_key = $('input[name="ai_interview_widget_gemini_api_key"]').val();
+                    data.azure_api_key = $('input[name="ai_interview_widget_azure_api_key"]').val();
+                    data.azure_endpoint = $('input[name="ai_interview_widget_azure_endpoint"]').val();
+                    data.custom_api_endpoint = $('input[name="ai_interview_widget_custom_api_endpoint"]').val();
+                    data.custom_api_key = $('input[name="ai_interview_widget_custom_api_key"]').val();
+                    break;
+                    
+                case 'voice':
+                    data.action = 'ai_interview_save_voice_settings';
+                    data.elevenlabs_api_key = $('input[name="ai_interview_widget_elevenlabs_api_key"]').val();
+                    data.elevenlabs_voice_id = $('input[name="ai_interview_widget_elevenlabs_voice_id"]').val();
+                    data.voice_quality = $('select[name="ai_interview_widget_voice_quality"]').val();
+                    data.enable_voice = $('input[name="ai_interview_widget_enable_voice"]').is(':checked') ? 1 : 0;
+                    data.disable_greeting_audio = $('input[name="ai_interview_widget_disable_greeting_audio"]').is(':checked') ? 1 : 0;
+                    data.disable_audio_visualization = $('input[name="ai_interview_widget_disable_audio_visualization"]').is(':checked') ? 1 : 0;
+                    data.chatbox_only_mode = $('input[name="ai_interview_widget_chatbox_only_mode"]').is(':checked') ? 1 : 0;
+                    break;
+                    
+                case 'system-prompt':
+                    data.action = 'ai_interview_save_system_prompt';
+                    break;
+                    
+                default:
+                    console.error('Unknown section:', section);
+                    resetButton(button);
+                    return;
+            }
+            
+            // Make AJAX request
+            $.ajax({
+                url: aiwAdmin.ajaxurl,
+                type: 'POST',
+                data: data,
+                timeout: 30000,
+                success: function(response) {
+                    if (response.success) {
+                        showMessage(messageDiv, response.data.message, 'success');
+                    } else {
+                        showMessage(messageDiv, response.data.message || aiwAdmin.strings.saveFailed, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Save error:', error);
+                    let errorMsg = aiwAdmin.strings.saveFailed;
+                    if (status === 'timeout') {
+                        errorMsg = 'Request timed out. Please try again.';
+                    }
+                    showMessage(messageDiv, errorMsg, 'error');
+                },
+                complete: function() {
+                    resetButton(button);
+                }
+            });
+        });
+    }
+    
+    /**
+     * Show success or error message
+     */
+    function showMessage(messageDiv, message, type) {
+        messageDiv.removeClass('notice-success notice-error');
+        
+        if (type === 'success') {
+            messageDiv.addClass('notice notice-success');
+            messageDiv.html('<p><strong>✓</strong> ' + message + '</p>');
+        } else {
+            messageDiv.addClass('notice notice-error');
+            messageDiv.html('<p><strong>✗</strong> ' + message + '</p>');
+        }
+        
+        messageDiv.show();
+        
+        // Auto-hide success messages after 5 seconds
+        if (type === 'success') {
+            setTimeout(function() {
+                messageDiv.fadeOut('slow');
+            }, 5000);
+        }
+    }
+    
+    /**
+     * Reset button to normal state
+     */
+    function resetButton(button) {
+        button.prop('disabled', false);
+        button.find('.button-text').show();
+        button.find('.button-spinner').hide();
+    }
 
 })(jQuery);
