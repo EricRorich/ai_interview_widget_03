@@ -502,7 +502,7 @@
                 case 'language':
                     data.action = 'ai_interview_save_language_settings';
                     data.default_language = $('select[name="ai_interview_widget_default_language"]').val();
-                    data.supported_languages = $('input[name="ai_interview_widget_supported_languages"]').val();
+                    data.supported_languages = $('#supported_languages_hidden').val();
                     break;
                     
                 case 'system-prompt':
