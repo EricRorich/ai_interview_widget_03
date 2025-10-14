@@ -10533,10 +10533,9 @@ public function documentation_page() {
         // Get and sanitize input
         $provider = isset($_POST['api_provider']) ? sanitize_text_field($_POST['api_provider']) : '';
         $model = isset($_POST['llm_model']) ? sanitize_text_field($_POST['llm_model']) : '';
-        // Get max_tokens with default from option, then validate range
-        $max_tokens_input = isset($_POST['max_tokens']) ? absint($_POST['max_tokens']) : 0;
-        $default_max_tokens = get_option('ai_interview_widget_max_tokens', 500);
-        $max_tokens = $max_tokens_input > 0 ? max(1, min(32768, $max_tokens_input)) : $default_max_tokens;
+        // Get max_tokens with validation (default to 500 if not provided)
+        $max_tokens_input = isset($_POST['max_tokens']) ? absint($_POST['max_tokens']) : 500;
+        $max_tokens = max(1, min(32768, $max_tokens_input));
         
         if (empty($provider)) {
             wp_send_json_error(array('message' => 'API provider is required'));
