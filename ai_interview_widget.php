@@ -103,6 +103,13 @@ class AIInterviewWidget {
         add_action('wp_ajax_ai_interview_update_preview', array($this, 'handle_preview_update'));
         add_action('wp_ajax_ai_interview_load_default_preset', array($this, 'load_default_preset'));
         add_action('wp_ajax_ai_interview_delete_preset', array($this, 'delete_design_preset'));
+        
+        // Section-specific save handlers
+        add_action('wp_ajax_ai_interview_save_provider_settings', array($this, 'save_provider_settings'));
+        add_action('wp_ajax_ai_interview_save_api_keys', array($this, 'save_api_keys'));
+        add_action('wp_ajax_ai_interview_save_voice_settings', array($this, 'save_voice_settings'));
+        add_action('wp_ajax_ai_interview_save_language_settings', array($this, 'save_language_settings'));
+        add_action('wp_ajax_ai_interview_save_system_prompt', array($this, 'save_system_prompt_section'));
         add_action('wp_ajax_ai_interview_get_presets', array($this, 'get_design_presets'));
         
         // AI Provider Management AJAX handlers
@@ -316,7 +323,10 @@ class AIInterviewWidget {
                 'error' => __('Error loading models. Please try again.', 'ai-interview-widget'),
                 'deprecated' => __('This model is deprecated', 'ai-interview-widget'),
                 'recommended' => __('Recommended model', 'ai-interview-widget'),
-                'experimental' => __('Experimental model', 'ai-interview-widget')
+                'experimental' => __('Experimental model', 'ai-interview-widget'),
+                'saving' => __('Saving...', 'ai-interview-widget'),
+                'saved' => __('Saved!', 'ai-interview-widget'),
+                'saveFailed' => __('Save failed. Please try again.', 'ai-interview-widget')
             )
         ));
     }
@@ -7428,7 +7438,7 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
     </div>
 
     <!-- AI Provider Selection Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #2196F3; background: linear-gradient(135deg, #f8fbff 0%, #e3f2fd 100%); box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);">
+    <div class="postbox aiw-settings-section" id="provider-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #2196F3; background: linear-gradient(135deg, #f8fbff 0%, #e3f2fd 100%); box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #2196F3;">🧠</span>
             <h3 style="margin: 0; color: #1565C0; font-size: 20px;">AI Provider Selection</h3>
@@ -7448,11 +7458,18 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->llm_model_field_callback(); ?></td>
                 </tr>
             </table>
+            <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button button-primary aiw-save-section" data-section="provider" style="font-size: 14px; padding: 8px 20px; background: #2196F3; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);">
+                    <span class="button-text">💾 Save Provider Settings</span>
+                    <span class="button-spinner" style="display: none; margin-left: 5px;">⏳</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- API Keys Configuration Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #FF9800; background: linear-gradient(135deg, #fffbf0 0%, #fff3e0 100%); box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);">
+    <div class="postbox aiw-settings-section" id="api-keys-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #FF9800; background: linear-gradient(135deg, #fffbf0 0%, #fff3e0 100%); box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #FF9800;">🔑</span>
             <h3 style="margin: 0; color: #E65100; font-size: 20px;">API Keys Configuration</h3>
@@ -7492,11 +7509,18 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->custom_api_key_field_callback(); ?></td>
                 </tr>
             </table>
+            <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button button-primary aiw-save-section" data-section="api-keys" style="font-size: 14px; padding: 8px 20px; background: #FF9800; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(255, 152, 0, 0.3);">
+                    <span class="button-text">💾 Save API Keys</span>
+                    <span class="button-spinner" style="display: none; margin-left: 5px;">⏳</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- ElevenLabs Voice Configuration Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #9C27B0; background: linear-gradient(135deg, #fafafa 0%, #f3e5f5 100%); box-shadow: 0 2px 8px rgba(156, 39, 176, 0.1);">
+    <div class="postbox aiw-settings-section" id="voice-settings-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #9C27B0; background: linear-gradient(135deg, #fafafa 0%, #f3e5f5 100%); box-shadow: 0 2px 8px rgba(156, 39, 176, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #9C27B0;">🎤</span>
             <h3 style="margin: 0; color: #6A1B9A; font-size: 20px;">ElevenLabs Voice Configuration</h3>
@@ -7536,11 +7560,18 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->chatbox_only_mode_field_callback(); ?></td>
                 </tr>
             </table>
+            <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button button-primary aiw-save-section" data-section="voice" style="font-size: 14px; padding: 8px 20px; background: #9C27B0; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(156, 39, 176, 0.3);">
+                    <span class="button-text">💾 Save Voice Settings</span>
+                    <span class="button-spinner" style="display: none; margin-left: 5px;">⏳</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Language Support Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #4CAF50; background: linear-gradient(135deg, #f9fffe 0%, #e8f5e8 100%); box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);">
+    <div class="postbox aiw-settings-section" id="language-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #4CAF50; background: linear-gradient(135deg, #f9fffe 0%, #e8f5e8 100%); box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #4CAF50;">🌍</span>
             <h3 style="margin: 0; color: #2E7D32; font-size: 20px;">Language Support</h3>
@@ -7560,17 +7591,24 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->supported_languages_field_callback(); ?></td>
                 </tr>
             </table>
+            <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button button-primary aiw-save-section" data-section="language" style="font-size: 14px; padding: 8px 20px; background: #4CAF50; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);">
+                    <span class="button-text">💾 Save Language Settings</span>
+                    <span class="button-spinner" style="display: none; margin-left: 5px;">⏳</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- System Prompt Upload Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #FF9800; background: linear-gradient(135deg, #fffef7 0%, #fff3e0 100%); box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);">
+    <div class="postbox aiw-settings-section" id="system-prompt-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #FF9800; background: linear-gradient(135deg, #fffef7 0%, #fff3e0 100%); box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #FF9800;">📄</span>
             <h3 style="margin: 0; color: #E65100; font-size: 20px;">System Prompt Management</h3>
         </div>
         <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #ffcc02; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <p style="margin: 0 0 15px 0; color: #666;">Upload text files or documents (.txt, .pdf, .doc, .docx, .odt, .rtf) or directly input system prompts for specific languages. Both methods will update the corresponding AI system prompts.</p>
+            <p style="margin: 0 0 15px 0; color: #666;">Upload text files or documents (.txt, .pdf, .doc, .docx, .odt, .rtf) or directly input system prompts for specific languages. Both methods will update the corresponding AI system prompts. Use the individual "Save" buttons for each language prompt below.</p>
             
             <?php
             $supported_langs = json_decode(get_option('ai_interview_widget_supported_languages', ''), true);
@@ -7847,11 +7885,6 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                 Last Updated: <strong>2025-08-03 18:45:35 UTC by EricRorich</strong>
             </div>
         </div>
-    </div>
-
-    <!-- Save Button -->
-    <div style="text-align: center; padding: 20px;">
-        <?php submit_button('💾 Save Configuration', 'primary', 'submit', false, array('style' => 'font-size: 16px; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;')); ?>
     </div>
 </form>
 
@@ -10446,6 +10479,192 @@ public function documentation_page() {
 
 <?php
 }
+
+    /**
+     * AJAX handler for saving AI Provider Selection settings
+     * 
+     * @since 1.9.7
+     */
+    public function save_provider_settings() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        // Get and sanitize input
+        $provider = isset($_POST['api_provider']) ? sanitize_text_field($_POST['api_provider']) : '';
+        $model = isset($_POST['llm_model']) ? sanitize_text_field($_POST['llm_model']) : '';
+        
+        if (empty($provider)) {
+            wp_send_json_error(array('message' => 'API provider is required'));
+            return;
+        }
+        
+        // Update options
+        update_option('ai_interview_widget_api_provider', $provider);
+        if (!empty($model)) {
+            update_option('ai_interview_widget_llm_model', $model);
+        }
+        
+        wp_send_json_success(array(
+            'message' => 'AI Provider settings saved successfully!',
+            'provider' => $provider,
+            'model' => $model
+        ));
+    }
+    
+    /**
+     * AJAX handler for saving API Keys Configuration settings
+     * 
+     * @since 1.9.7
+     */
+    public function save_api_keys() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        // Get and sanitize API keys
+        $openai_key = isset($_POST['openai_api_key']) ? $this->sanitize_api_key($_POST['openai_api_key']) : '';
+        $anthropic_key = isset($_POST['anthropic_api_key']) ? $this->sanitize_api_key($_POST['anthropic_api_key']) : '';
+        $gemini_key = isset($_POST['gemini_api_key']) ? $this->sanitize_api_key($_POST['gemini_api_key']) : '';
+        $azure_key = isset($_POST['azure_api_key']) ? $this->sanitize_api_key($_POST['azure_api_key']) : '';
+        $azure_endpoint = isset($_POST['azure_endpoint']) ? esc_url_raw($_POST['azure_endpoint']) : '';
+        $custom_endpoint = isset($_POST['custom_api_endpoint']) ? esc_url_raw($_POST['custom_api_endpoint']) : '';
+        $custom_key = isset($_POST['custom_api_key']) ? $this->sanitize_api_key($_POST['custom_api_key']) : '';
+        
+        // Update options
+        update_option('ai_interview_widget_openai_api_key', $openai_key);
+        update_option('ai_interview_widget_anthropic_api_key', $anthropic_key);
+        update_option('ai_interview_widget_gemini_api_key', $gemini_key);
+        update_option('ai_interview_widget_azure_api_key', $azure_key);
+        update_option('ai_interview_widget_azure_endpoint', $azure_endpoint);
+        update_option('ai_interview_widget_custom_api_endpoint', $custom_endpoint);
+        update_option('ai_interview_widget_custom_api_key', $custom_key);
+        
+        wp_send_json_success(array(
+            'message' => 'API Keys saved successfully!'
+        ));
+    }
+    
+    /**
+     * AJAX handler for saving ElevenLabs Voice Configuration settings
+     * 
+     * @since 1.9.7
+     */
+    public function save_voice_settings() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        // Get and sanitize voice settings
+        $elevenlabs_key = isset($_POST['elevenlabs_api_key']) ? $this->sanitize_elevenlabs_api_key($_POST['elevenlabs_api_key']) : '';
+        $voice_id = isset($_POST['elevenlabs_voice_id']) ? sanitize_text_field($_POST['elevenlabs_voice_id']) : '';
+        $voice_quality = isset($_POST['voice_quality']) ? sanitize_text_field($_POST['voice_quality']) : '';
+        $enable_voice = isset($_POST['enable_voice']) ? rest_sanitize_boolean($_POST['enable_voice']) : true;
+        $disable_greeting = isset($_POST['disable_greeting_audio']) ? rest_sanitize_boolean($_POST['disable_greeting_audio']) : false;
+        $disable_viz = isset($_POST['disable_audio_visualization']) ? rest_sanitize_boolean($_POST['disable_audio_visualization']) : false;
+        $chatbox_only = isset($_POST['chatbox_only_mode']) ? rest_sanitize_boolean($_POST['chatbox_only_mode']) : false;
+        
+        // Update options
+        update_option('ai_interview_widget_elevenlabs_api_key', $elevenlabs_key);
+        update_option('ai_interview_widget_elevenlabs_voice_id', $voice_id);
+        update_option('ai_interview_widget_voice_quality', $voice_quality);
+        update_option('ai_interview_widget_enable_voice', $enable_voice);
+        update_option('ai_interview_widget_disable_greeting_audio', $disable_greeting);
+        update_option('ai_interview_widget_disable_audio_visualization', $disable_viz);
+        update_option('ai_interview_widget_chatbox_only_mode', $chatbox_only);
+        
+        wp_send_json_success(array(
+            'message' => 'Voice settings saved successfully!'
+        ));
+    }
+    
+    /**
+     * AJAX handler for saving Language Support settings
+     * 
+     * @since 1.9.7
+     */
+    public function save_language_settings() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        // Get and sanitize language settings
+        $default_language = isset($_POST['default_language']) ? sanitize_text_field($_POST['default_language']) : 'en';
+        $supported_languages_raw = isset($_POST['supported_languages']) ? wp_unslash($_POST['supported_languages']) : '';
+        
+        // Validate and sanitize supported languages JSON
+        $supported_languages = '';
+        if (!empty($supported_languages_raw)) {
+            // Decode JSON first
+            $lang_data = json_decode($supported_languages_raw, true);
+            
+            if (json_last_error() === JSON_ERROR_NONE && is_array($lang_data)) {
+                // Sanitize each language code and name
+                $sanitized_langs = array();
+                foreach ($lang_data as $code => $name) {
+                    $sanitized_code = sanitize_text_field($code);
+                    $sanitized_name = sanitize_text_field($name);
+                    if (!empty($sanitized_code) && !empty($sanitized_name)) {
+                        $sanitized_langs[$sanitized_code] = $sanitized_name;
+                    }
+                }
+                $supported_languages = json_encode($sanitized_langs);
+            } else {
+                wp_send_json_error(array('message' => 'Invalid language data format'));
+                return;
+            }
+        }
+        
+        // Update options
+        update_option('ai_interview_widget_default_language', $default_language);
+        update_option('ai_interview_widget_supported_languages', $supported_languages);
+        
+        wp_send_json_success(array(
+            'message' => 'Language settings saved successfully!'
+        ));
+    }
+    
+    /**
+     * AJAX handler for saving System Prompt section
+     * Note: System prompts are saved via the existing direct save mechanism
+     * This handler just provides feedback for the section
+     * 
+     * @since 1.9.7
+     */
+    public function save_system_prompt_section() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        wp_send_json_success(array(
+            'message' => 'System prompts can be saved using the individual "Save" buttons for each language above.'
+        ));
+    }
 }
 
 // Initialize the plugin
