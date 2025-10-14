@@ -108,6 +108,7 @@ class AIInterviewWidget {
         add_action('wp_ajax_ai_interview_save_provider_settings', array($this, 'save_provider_settings'));
         add_action('wp_ajax_ai_interview_save_api_keys', array($this, 'save_api_keys'));
         add_action('wp_ajax_ai_interview_save_voice_settings', array($this, 'save_voice_settings'));
+        add_action('wp_ajax_ai_interview_save_language_settings', array($this, 'save_language_settings'));
         add_action('wp_ajax_ai_interview_save_system_prompt', array($this, 'save_system_prompt_section'));
         add_action('wp_ajax_ai_interview_get_presets', array($this, 'get_design_presets'));
         
@@ -7570,7 +7571,7 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
     </div>
 
     <!-- Language Support Container -->
-    <div class="postbox" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #4CAF50; background: linear-gradient(135deg, #f9fffe 0%, #e8f5e8 100%); box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);">
+    <div class="postbox aiw-settings-section" id="language-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #4CAF50; background: linear-gradient(135deg, #f9fffe 0%, #e8f5e8 100%); box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #4CAF50;">🌍</span>
             <h3 style="margin: 0; color: #2E7D32; font-size: 20px;">Language Support</h3>
@@ -7590,6 +7591,13 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->supported_languages_field_callback(); ?></td>
                 </tr>
             </table>
+            <div class="aiw-section-message" style="display: none; margin: 15px 0; padding: 10px; border-radius: 4px;"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button button-primary aiw-save-section" data-section="language" style="font-size: 14px; padding: 8px 20px; background: #4CAF50; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);">
+                    <span class="button-text">💾 Save Language Settings</span>
+                    <span class="button-spinner" style="display: none; margin-left: 5px;">⏳</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -10582,6 +10590,46 @@ public function documentation_page() {
         
         wp_send_json_success(array(
             'message' => 'Voice settings saved successfully!'
+        ));
+    }
+    
+    /**
+     * AJAX handler for saving Language Support settings
+     * 
+     * @since 1.9.7
+     */
+    public function save_language_settings() {
+        // Verify nonce
+        check_ajax_referer('ai_interview_admin', 'nonce');
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized access'));
+            return;
+        }
+        
+        // Get and sanitize language settings
+        $default_language = isset($_POST['default_language']) ? sanitize_text_field($_POST['default_language']) : 'en';
+        $supported_languages = isset($_POST['supported_languages']) ? $_POST['supported_languages'] : '';
+        
+        // Sanitize supported languages (it's a JSON string)
+        if (!empty($supported_languages)) {
+            // Validate JSON
+            $lang_data = json_decode($supported_languages, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $supported_languages = json_encode($lang_data);
+            } else {
+                wp_send_json_error(array('message' => 'Invalid language data format'));
+                return;
+            }
+        }
+        
+        // Update options
+        update_option('ai_interview_widget_default_language', $default_language);
+        update_option('ai_interview_widget_supported_languages', $supported_languages);
+        
+        wp_send_json_success(array(
+            'message' => 'Language settings saved successfully!'
         ));
     }
     

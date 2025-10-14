@@ -499,6 +499,12 @@
                     data.chatbox_only_mode = $('input[name="ai_interview_widget_chatbox_only_mode"]').is(':checked') ? 1 : 0;
                     break;
                     
+                case 'language':
+                    data.action = 'ai_interview_save_language_settings';
+                    data.default_language = $('select[name="ai_interview_widget_default_language"]').val();
+                    data.supported_languages = $('input[name="ai_interview_widget_supported_languages"]').val();
+                    break;
+                    
                 case 'system-prompt':
                     data.action = 'ai_interview_save_system_prompt';
                     break;
