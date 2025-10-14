@@ -10610,16 +10610,25 @@ public function documentation_page() {
         
         // Get and sanitize language settings
         $default_language = isset($_POST['default_language']) ? sanitize_text_field($_POST['default_language']) : 'en';
-        $supported_languages = isset($_POST['supported_languages']) ? wp_unslash($_POST['supported_languages']) : '';
+        $supported_languages_raw = isset($_POST['supported_languages']) ? wp_unslash($_POST['supported_languages']) : '';
         
-        // Sanitize supported languages (it's a JSON string)
-        if (!empty($supported_languages)) {
-            $supported_languages = sanitize_textarea_field($supported_languages);
+        // Validate and sanitize supported languages JSON
+        $supported_languages = '';
+        if (!empty($supported_languages_raw)) {
+            // Decode JSON first
+            $lang_data = json_decode($supported_languages_raw, true);
             
-            // Validate JSON
-            $lang_data = json_decode($supported_languages, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($lang_data)) {
-                $supported_languages = json_encode($lang_data);
+                // Sanitize each language code and name
+                $sanitized_langs = array();
+                foreach ($lang_data as $code => $name) {
+                    $sanitized_code = sanitize_text_field($code);
+                    $sanitized_name = sanitize_text_field($name);
+                    if (!empty($sanitized_code) && !empty($sanitized_name)) {
+                        $sanitized_langs[$sanitized_code] = $sanitized_name;
+                    }
+                }
+                $supported_languages = json_encode($sanitized_langs);
             } else {
                 wp_send_json_error(array('message' => 'Invalid language data format'));
                 return;
