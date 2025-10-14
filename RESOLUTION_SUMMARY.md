@@ -30,7 +30,7 @@ The WordPress Settings API requires **all registered settings** in an option gro
 ### Code Changes (PR #2)
 Added hidden input fields in `ai_interview_widget.php` to preserve the 9 missing settings:
 
-**Location:** Lines 7397-7422 in `admin_page()` function
+**Location:** Lines 7398-7422 in the `admin_page()` function (specifically the hidden fields preservation code)
 
 **What was added:**
 - Array of 9 hidden settings with their types
@@ -126,7 +126,7 @@ Display success message
 ## Files Modified
 
 ### Code Implementation (PR #2)
-- `ai_interview_widget.php` - Lines 7397-7422 (hidden fields)
+- `ai_interview_widget.php` - Lines 7398-7422 in `admin_page()` function (hidden fields preservation)
 
 ### Documentation (PR #2)
 - `SETTINGS_FORM_FIX.md` - Technical documentation
@@ -171,14 +171,15 @@ No syntax errors detected in ai_interview_widget.php
 
 This implementation fully complies with the WordPress Settings API:
 
-| Requirement | Implementation | Location |
-|-------------|----------------|----------|
+| Requirement | Implementation | Location (Function: admin_page()) |
+|-------------|----------------|-----------------------------------|
 | Form action | `options.php` | Line 7394 |
 | Nonces | `settings_fields()` | Line 7395 |
-| Settings in POST | 27 total (18 visible + 9 hidden) | Lines 7397-7856 |
+| Hidden fields | 9 settings preserved | Lines 7398-7422 |
+| Visible fields | 18 settings displayed | Lines 7424-7850 |
 | Submit button | `submit_button()` | Line 7854 |
 | Success messages | `settings_errors()` | Line 7319 |
-| Sanitization | Callbacks in `register_setting()` | Lines 734-1013 |
+| Sanitization | Callbacks in `register_setting()` | Lines 734-1013 (register_settings function) |
 
 ---
 
