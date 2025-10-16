@@ -794,6 +794,16 @@ class AIInterviewWidget {
                 'default' => 'eleven_multilingual_v2'
             )
         );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_elevenlabs_voice_speed',
+            array(
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_elevenlabs_voice_speed'),
+                'default' => 1.0
+            )
+        );
         
         // Audio Control Settings
         register_setting(
@@ -1147,6 +1157,14 @@ class AIInterviewWidget {
             'voice_quality',
             'Voice Model',
             array($this, 'voice_quality_field_callback'),
+            'ai-interview-widget',
+            'ai_interview_widget_elevenlabs_section'
+        );
+
+        add_settings_field(
+            'elevenlabs_voice_speed',
+            'Voice Speed',
+            array($this, 'elevenlabs_voice_speed_field_callback'),
             'ai-interview-widget',
             'ai_interview_widget_elevenlabs_section'
         );
@@ -5996,6 +6014,21 @@ return get_option('ai_interview_widget_elevenlabs_api_key', '');
 return $api_key;
 }
 
+// Sanitize ElevenLabs voice speed
+public function sanitize_elevenlabs_voice_speed($speed) {
+    // Convert to float
+    $speed = floatval($speed);
+    
+    // Ensure speed is within ElevenLabs API limits (0.7 to 1.2)
+    if ($speed < 0.7) {
+        $speed = 0.7;
+    } elseif ($speed > 1.2) {
+        $speed = 1.2;
+    }
+    
+    return $speed;
+}
+
 /**
  * FIXED: Ensure valid model setting is always available
  */
@@ -6090,6 +6123,7 @@ return false;
 
 $voice_id = get_option('ai_interview_widget_elevenlabs_voice_id', 'pqHfZKP75CvOlQylNhV4');
 $voice_model = get_option('ai_interview_widget_voice_quality', 'eleven_multilingual_v2');
+$voice_speed = get_option('ai_interview_widget_elevenlabs_voice_speed', 1.0);
 
 $body = array(
 'text' => $text,
@@ -6098,13 +6132,14 @@ $body = array(
 'stability' => 0.5,
 'similarity_boost' => 0.8,
 'style' => 0.0,
-'use_speaker_boost' => true
+'use_speaker_boost' => true,
+'speed' => floatval($voice_speed)
 )
 );
 
-error_log('AI Interview Widget: Generating TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model);
+error_log('AI Interview Widget: Generating TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model . ', speed: ' . $voice_speed);
 
-$response = wp_remote_post("https://api.elevenlabs.io/v1/text-to-speech/{$voice_id}", array(
+$response = wp_remote_post("https://api.elevenlabs.io/v1/text-to-speech/{$voice_id}?output_format=mp3_44100_128", array(
 'headers' => array(
 'xi-api-key' => $api_key,
 'Content-Type' => 'application/json',
@@ -7635,6 +7670,10 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->voice_quality_field_callback(); ?></td>
                 </tr>
                 <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">Voice Speed</th>
+                    <td><?php $this->elevenlabs_voice_speed_field_callback(); ?></td>
+                </tr>
+                <tr>
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Enable Voice Features</th>
                     <td><?php $this->enable_voice_field_callback(); ?></td>
                 </tr>
@@ -8243,6 +8282,20 @@ $voice_quality = get_option('ai_interview_widget_voice_quality', 'eleven_multili
     <option value="eleven_turbo_v2" <?php selected($voice_quality, 'eleven_turbo_v2'); ?>>Turbo V2 (Fastest)</option>
 </select>
 <p class="description">Voice model to use. Multilingual V2 provides the best quality for both English and German.</p>
+<?php
+}
+
+public function elevenlabs_voice_speed_field_callback() {
+$voice_speed = get_option('ai_interview_widget_elevenlabs_voice_speed', 1.0);
+?>
+<input type="number" id="elevenlabs_voice_speed" name="ai_interview_widget_elevenlabs_voice_speed"
+       value="<?php echo esc_attr($voice_speed); ?>"
+       class="small-text"
+       min="0.7"
+       max="1.2"
+       step="0.05"
+       placeholder="1.0">
+<p class="description">Voice playback speed (0.7x - 1.2x). Default is 1.0 for normal speed. Lower values are slower, higher values are faster.</p>
 <?php
 }
 
@@ -10707,6 +10760,7 @@ public function documentation_page() {
         $elevenlabs_key = isset($_POST['elevenlabs_api_key']) ? $this->sanitize_elevenlabs_api_key($_POST['elevenlabs_api_key']) : '';
         $voice_id = isset($_POST['elevenlabs_voice_id']) ? sanitize_text_field($_POST['elevenlabs_voice_id']) : '';
         $voice_quality = isset($_POST['voice_quality']) ? sanitize_text_field($_POST['voice_quality']) : '';
+        $voice_speed = isset($_POST['elevenlabs_voice_speed']) ? $this->sanitize_elevenlabs_voice_speed($_POST['elevenlabs_voice_speed']) : 1.0;
         $enable_voice = isset($_POST['enable_voice']) ? rest_sanitize_boolean($_POST['enable_voice']) : true;
         $disable_greeting = isset($_POST['disable_greeting_audio']) ? rest_sanitize_boolean($_POST['disable_greeting_audio']) : false;
         $disable_viz = isset($_POST['disable_audio_visualization']) ? rest_sanitize_boolean($_POST['disable_audio_visualization']) : false;
@@ -10716,6 +10770,7 @@ public function documentation_page() {
         update_option('ai_interview_widget_elevenlabs_api_key', $elevenlabs_key);
         update_option('ai_interview_widget_elevenlabs_voice_id', $voice_id);
         update_option('ai_interview_widget_voice_quality', $voice_quality);
+        update_option('ai_interview_widget_elevenlabs_voice_speed', $voice_speed);
         update_option('ai_interview_widget_enable_voice', $enable_voice);
         update_option('ai_interview_widget_disable_greeting_audio', $disable_greeting);
         update_option('ai_interview_widget_disable_audio_visualization', $disable_viz);
