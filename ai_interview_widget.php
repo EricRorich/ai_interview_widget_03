@@ -854,7 +854,7 @@ class AIInterviewWidget {
             'ai_interview_widget_max_tokens',
             array(
                 'type' => 'integer',
-                'sanitize_callback' => 'absint',
+                'sanitize_callback' => array($this, 'sanitize_max_tokens'),
                 'default' => 500
             )
         );
@@ -8106,6 +8106,19 @@ public function max_tokens_field_callback() {
         Note: Higher values may increase API costs and response time.
     </p>
     <?php
+}
+
+/**
+ * Sanitize and validate max_tokens setting
+ * 
+ * @param mixed $value The value to sanitize
+ * @return int The sanitized and validated value
+ * @since 1.9.8
+ */
+public function sanitize_max_tokens($value) {
+    $value = absint($value);
+    // Ensure value is between 1 and 32768
+    return max(1, min(32768, $value));
 }
 
 public function api_key_field_callback() {
