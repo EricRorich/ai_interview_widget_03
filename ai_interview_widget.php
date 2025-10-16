@@ -7151,7 +7151,7 @@ private function get_system_prompt_from_settings($lang_code = 'en') {
     $content_settings = get_option('ai_interview_widget_content_settings', '');
     
     // Handle empty settings - return default immediately
-    if (empty($content_settings)) {
+    if ($content_settings === '' || $content_settings === false) {
         return $this->get_default_system_prompt($lang_code);
     }
     
