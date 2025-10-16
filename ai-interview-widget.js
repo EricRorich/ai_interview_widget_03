@@ -1351,7 +1351,15 @@ document.addEventListener('DOMContentLoaded', function() {
         /**
          * Comprehensive mapping of countries to languages based on primary language spoken
          * Maps ISO 3166-1 alpha-2 country codes to the 20 supported language codes
-         * Designed for extensibility - new languages can be easily added
+         * 
+         * Note: Countries with multiple official languages are mapped to the most widely used language.
+         * For example, Belgium (BE) is mapped to French as it's the most common, though German is
+         * also spoken in the eastern region. Switzerland (CH) and Luxembourg (LU) are mapped to German
+         * as it's one of the primary languages, but they're multilingual nations.
+         * 
+         * Designed for extensibility - new languages can be easily added.
+         * 
+         * @returns {Object} Mapping of ISO 3166-1 alpha-2 country codes to language codes
          */
         function getCountryToLanguageMapping() {
             return {
@@ -1374,11 +1382,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Chinese-speaking countries/regions
                 'CN': 'zh', 'TW': 'zh', 'HK': 'zh', 'MO': 'zh', 'SG': 'zh',
                 
-                // German-speaking countries
-                'DE': 'de', 'AT': 'de', 'CH': 'de', 'LI': 'de', 'LU': 'de',
+                // German-speaking countries and regions
+                // Core German-speaking countries: Germany, Austria, Liechtenstein
+                // Multilingual with significant German: Switzerland, Luxembourg
+                'DE': 'de', // Germany (primary German)
+                'AT': 'de', // Austria (primary German)
+                'LI': 'de', // Liechtenstein (primary German)
+                'CH': 'de', // Switzerland (German is one of 4 official languages, most widely spoken)
+                'LU': 'de', // Luxembourg (German is one of 3 official languages)
+                // Note: Belgium (BE) has a small German-speaking region in the east,
+                // but French/Dutch are more prevalent, so it's mapped to French below
                 
                 // French-speaking countries
-                'FR': 'fr', 'BE': 'fr', 'MC': 'fr', 'LU': 'fr', 'SN': 'fr', 'ML': 'fr',
+                'FR': 'fr', 'BE': 'fr', 'MC': 'fr', 'SN': 'fr', 'ML': 'fr',
                 'BF': 'fr', 'NE': 'fr', 'CI': 'fr', 'GN': 'fr', 'TD': 'fr', 'CM': 'fr',
                 'CF': 'fr', 'CG': 'fr', 'GA': 'fr', 'MG': 'fr', 'BI': 'fr', 'RW': 'fr',
                 'DJ': 'fr', 'KM': 'fr', 'SC': 'fr', 'VU': 'fr', 'NC': 'fr', 'PF': 'fr',
@@ -1515,9 +1531,17 @@ document.addEventListener('DOMContentLoaded', function() {
         /**
          * Enhanced user language detection with comprehensive country-to-language mapping
          * Supports all 20 configured languages with robust fallback logic
+         * 
+         * Detection priority:
+         * 1. IP-based geolocation (most accurate for location)
+         * 2. Browser language preference
+         * 3. Timezone-based detection
+         * 4. Fallback to English
+         * 
+         * @returns {Promise<string>} Detected language code (ISO 639-1)
          */
         async function detectUserLanguage() {
-            debug("Detecting user language...");
+            debug("=== Starting language detection ===");
             
             // Start with browser language preference as fallback
             let locale = getLocalePreference();
@@ -1525,13 +1549,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Initialize detectedCountry variable in function scope
             let detectedCountry = null;
+            let detectionMethod = 'browser';
             
             // Try to detect country via IP and map to supported language
             try {
                 detectedCountry = await detectCountryAutomatically();
                 
                 if (detectedCountry) {
-                    debug("Country detected via IP:", detectedCountry);
+                    debug("✓ Country detected via IP geolocation:", detectedCountry);
                     
                     // Get country-to-language mapping
                     const countryLanguageMap = getCountryToLanguageMapping();
@@ -1539,44 +1564,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Check if detected country has a language mapping
                     if (countryLanguageMap[detectedCountry]) {
                         const mappedLanguage = countryLanguageMap[detectedCountry];
+                        debug("Country mapping found:", detectedCountry, "→", mappedLanguage);
                         
                         // Validate that the mapped language is in our supported languages
-                        // Get supported languages from widget data or fallback to defaults
                         const supportedLanguages = getSupportedLanguages();
                         
                         if (supportedLanguages.includes(mappedLanguage)) {
                             locale = mappedLanguage;
-                            debug(`Final language: ${mappedLanguage} (IP-detected country: ${detectedCountry})`);
+                            detectionMethod = 'ip-geolocation';
+                            debug(`✓ Language detected: ${mappedLanguage} (from IP-detected country: ${detectedCountry})`);
                         } else {
-                            debug(`Mapped language ${mappedLanguage} not in supported languages, using fallback`);
+                            debug(`⚠ Mapped language ${mappedLanguage} not in supported languages, using fallback`);
                             locale = 'en'; // Default to English if mapped language not supported
+                            detectionMethod = 'fallback-unsupported';
                         }
                     } else {
-                        debug(`No language mapping found for country ${detectedCountry}, defaulting to English`);
+                        debug(`⚠ No language mapping found for country ${detectedCountry}, defaulting to English`);
                         locale = 'en'; // Default to English for unmapped countries
+                        detectionMethod = 'fallback-unmapped';
                     }
                 } else {
-                    debug("No country detected, keeping browser/timezone selection:", locale);
+                    debug("ℹ No country detected, keeping browser/timezone selection:", locale);
+                    detectionMethod = 'browser-fallback';
                 }
             } catch (error) {
-                debug("Country detection failed:", error);
+                debug("✗ Country detection failed:", error.message);
                 debug("Using browser/timezone selection:", locale);
                 // Ensure detectedCountry remains null when detection fails
                 detectedCountry = null;
+                detectionMethod = 'error-fallback';
             }
             
             // Final validation - ensure detected language is supported
             const supportedLanguages = getSupportedLanguages();
             if (!supportedLanguages.includes(locale)) {
-                debug(`Detected language ${locale} not supported, defaulting to English`);
+                debug(`⚠ Detected language ${locale} not supported, defaulting to English`);
                 locale = 'en';
+                detectionMethod = 'final-fallback';
             }
             
             detectedLanguage = locale;
-            debug("Final detected language:", detectedLanguage);
+            debug("=== Language detection complete ===");
+            debug("✓ Final detected language:", detectedLanguage);
+            debug("✓ Detection method:", detectionMethod);
             
             // Log comprehensive language detection summary for debugging
-            logLanguageDetectionSummary(locale, detectedCountry);
+            logLanguageDetectionSummary(locale, detectedCountry, detectionMethod);
             
             // Initialize voice features after language detection
             if (voiceEnabled) {
@@ -1592,8 +1625,9 @@ document.addEventListener('DOMContentLoaded', function() {
          * 
          * @param {string} finalLanguage The final selected language 
          * @param {string|null} detectedCountry The detected country code
+         * @param {string} detectionMethod The method used for detection
          */
-        function logLanguageDetectionSummary(finalLanguage, detectedCountry) {
+        function logLanguageDetectionSummary(finalLanguage, detectedCountry, detectionMethod) {
           if (!DEBUG) return;
           
           const supportedLanguages = getSupportedLanguages();
@@ -1602,11 +1636,23 @@ document.addEventListener('DOMContentLoaded', function() {
           console.group('🌍 Language Detection Summary');
           console.log('📍 Detected Country:', detectedCountry || 'Not detected');
           console.log('🗣️ Final Language:', finalLanguage);
+          console.log('🔍 Detection Method:', detectionMethod);
           console.log('💾 Supported Languages:', supportedLanguages.length, 'languages');
-          console.log('🔗 Country Mapping Available:', detectedCountry && countryMapping[detectedCountry] ? 'Yes' : 'No');
+          console.log('🔗 Country Mapping Available:', detectedCountry && countryMapping[detectedCountry] ? 'Yes (' + countryMapping[detectedCountry] + ')' : 'No');
           console.log('📦 System Prompts Available:', Object.keys(systemPrompts).filter(lang => systemPrompts[lang] && systemPrompts[lang].trim() !== ''));
           console.log('💬 Welcome Messages Available:', Object.keys(welcomeMessages).filter(lang => welcomeMessages[lang] && welcomeMessages[lang].trim() !== ''));
-          console.log('⚡ Detection Method:', detectedCountry ? 'IP-based' : 'Browser/Timezone-based');
+          
+          // Detection method breakdown
+          const methodDescriptions = {
+              'ip-geolocation': '✓ Successful IP-based geolocation',
+              'browser': '✓ Browser language preference',
+              'browser-fallback': 'ℹ Browser fallback (no IP detected)',
+              'fallback-unsupported': '⚠ Country detected but language unsupported',
+              'fallback-unmapped': '⚠ Country detected but no language mapping',
+              'error-fallback': '✗ Detection error, using browser fallback',
+              'final-fallback': '⚠ Language not supported, using English'
+          };
+          console.log('📝 Status:', methodDescriptions[detectionMethod] || detectionMethod);
           console.groupEnd();
         }
 
@@ -1629,9 +1675,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return ['en', 'zh', 'es', 'hi', 'ar', 'pt', 'bn', 'ru', 'ja', 'pa', 'de', 'jv', 'ko', 'fr', 'te', 'mr', 'tr', 'ta', 'vi', 'it'];
         }
 
+        /**
+         * Determine which audio file to load based on detected language
+         * Supports German and English audio with fallback logic
+         * 
+         * @returns {Promise<Object|null>} Object with primary and alt audio URLs, or null
+         */
         function determineAudioSource() {
             return new Promise(async (resolve) => {
-                debug("Determining audio source...");
+                debug("=== Determining audio source ===");
                 debug("Available audio URLs:", {
                     en: widgetData.greeting_en,
                     de: widgetData.greeting_de,
@@ -1640,7 +1692,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Check if audio files are available
                 if (!widgetData.audio_files_available && !widgetData.greeting_en && !widgetData.greeting_de) {
-                    debug("No audio files available from server");
+                    debug("✗ No audio files available from server");
                     resolve(null);
                     return;
                 }
@@ -1649,19 +1701,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 const locale = await detectUserLanguage();
                 let selectedSrc = '';
                 let selectedSrcAlt = '';
+                let selectionReason = '';
                 
                 // Set selection based on detected language
+                // Priority: German audio for German speakers, English for everyone else
                 if (locale === 'de' && widgetData.greeting_de) {
                     selectedSrc = widgetData.greeting_de;
                     selectedSrcAlt = widgetData.greeting_de_alt;
-                    debug("Selected German audio");
+                    selectionReason = 'German audio selected for German language';
+                    debug("✓ Selected German audio for locale:", locale);
                 } else if (widgetData.greeting_en) {
                     selectedSrc = widgetData.greeting_en;
                     selectedSrcAlt = widgetData.greeting_en_alt;
-                    debug("Selected English audio");
+                    selectionReason = locale === 'de' ? 
+                        'English audio selected (German audio not available)' :
+                        'English audio selected (default for non-German languages)';
+                    debug("✓ Selected English audio for locale:", locale);
+                } else {
+                    debug("✗ No suitable audio file found for locale:", locale);
+                    selectionReason = 'No audio files available';
                 }
                 
-                debug("Final audio selection:", { primary: selectedSrc, alt: selectedSrcAlt });
+                debug("=== Audio selection complete ===");
+                debug("Selected audio:", { 
+                    primary: selectedSrc, 
+                    alt: selectedSrcAlt,
+                    reason: selectionReason,
+                    locale: locale
+                });
+                
                 resolve({ primary: selectedSrc, alt: selectedSrcAlt });
             });
         }
