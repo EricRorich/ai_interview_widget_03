@@ -7149,14 +7149,24 @@ echo '<meta name="ai-widget-nonce" content="' . esc_attr($nonce) . '">';
 private function get_system_prompt_from_settings($lang_code = 'en') {
     // Get saved content settings
     $content_settings = get_option('ai_interview_widget_content_settings', '');
-    $content_data = json_decode($content_settings, true);
-    $json_error = json_last_error(); // Capture error state immediately
     
-    // Check for JSON decode errors or invalid data
-    if ($json_error !== JSON_ERROR_NONE || !is_array($content_data)) {
-        if ($json_error !== JSON_ERROR_NONE) {
-            error_log('AI Interview Widget: JSON decode error in content settings: ' . json_last_error_msg());
-        }
+    // Handle empty settings - return default immediately
+    if (empty($content_settings)) {
+        return $this->get_default_system_prompt($lang_code);
+    }
+    
+    // Decode JSON and capture error state immediately
+    $content_data = json_decode($content_settings, true);
+    $json_error = json_last_error();
+    
+    // Check for JSON decode errors or invalid data type
+    if ($json_error !== JSON_ERROR_NONE) {
+        error_log('AI Interview Widget: JSON decode error in content settings: ' . json_last_error_msg());
+        return $this->get_default_system_prompt($lang_code);
+    }
+    
+    if (!is_array($content_data)) {
+        error_log('AI Interview Widget: Content settings is not an array, using default prompt');
         return $this->get_default_system_prompt($lang_code);
     }
     
