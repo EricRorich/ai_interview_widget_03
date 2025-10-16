@@ -6290,6 +6290,15 @@ wp_send_json_error(array(
 }
 
 private function get_ai_response($user_message, $system_prompt = '') {
+    // Use saved system prompt from settings if not provided by frontend
+    if (empty($system_prompt)) {
+        // Get default language from settings, fallback to 'en'
+        $default_lang = get_option('ai_interview_widget_default_language', 'en');
+        // Retrieve system prompt from settings for the default language
+        $system_prompt = $this->get_system_prompt_from_settings($default_lang);
+        error_log('AI Interview Widget: Using saved system prompt for language: ' . $default_lang);
+    }
+    
     $provider = get_option('ai_interview_widget_api_provider', 'openai');
     
     try {
@@ -6338,10 +6347,6 @@ return array('error' => 'API key not configured', 'error_type' => 'configuration
 if (!$this->starts_with($openai_api_key, 'sk-') || strlen($openai_api_key) < 40) {
 error_log('AI Interview Widget: Invalid API key format');
 return array('error' => 'Invalid API key format', 'error_type' => 'configuration');
-}
-
-if (empty($system_prompt)) {
-$system_prompt = "You are Eric Rorich, a creative technologist from Germany. Answer as Eric would, mentioning your experience with 3D art, AI workflows, and innovative projects.";
 }
 
 // FIXED: Robust model parameter validation using helper method
@@ -7131,6 +7136,41 @@ echo '<meta name="ai-widget-nonce" content="' . esc_attr($nonce) . '">';
 }
 
 // Helper method to get default system prompts for different languages
+/**
+ * Get system prompt from settings for a specific language
+ * 
+ * Retrieves the saved system prompt from plugin settings. Falls back to default
+ * prompt if no custom prompt has been saved.
+ * 
+ * @since 1.9.6
+ * @param string $lang_code Language code (e.g., 'en', 'de')
+ * @return string The system prompt for the specified language
+ */
+private function get_system_prompt_from_settings($lang_code = 'en') {
+    // Get saved content settings
+    $content_settings = get_option('ai_interview_widget_content_settings', '');
+    $content_data = json_decode($content_settings, true);
+    
+    // Try to get saved prompt for the specified language
+    $prompt_key = 'Systemprompts_Placeholder_' . $lang_code;
+    if (!empty($content_data[$prompt_key])) {
+        return $content_data[$prompt_key];
+    }
+    
+    // Fallback to default prompt for this language
+    return $this->get_default_system_prompt($lang_code);
+}
+
+/**
+ * Get default system prompt for a specific language
+ * 
+ * Provides default prompts for initial setup. These are only used if
+ * no custom prompt has been saved in the settings.
+ * 
+ * @since 1.9.6
+ * @param string $lang_code Language code (e.g., 'en', 'de')
+ * @return string The default system prompt for the specified language
+ */
 private function get_default_system_prompt($lang_code) {
     $default_prompts = array(
         'en' => "You are Eric Rorich, a creative and multidisciplinary professional from Braunschweig, Germany. Born in the 1980s, you grew up in the analog world and witnessed the dawn of the digital age. This makes you a person from both worlds—able to combine the tactile, hands-on experience of analog craft with cutting-edge digital skills and thinking. You consider this blend a unique advantage in your creative and technical work.\n\nYou have extensive experience as a 3D artist, video editor, and operator in digital media, having worked for companies such as VW and Studio B12. You founded and led Quantumpix GmbH, specializing in 3D visualizations, animations, and visual effects for images, films, and interactive media.\n\nYour education includes training as an Industrial Electronics Technician at VW, university entrance qualification (Abitur) from Braunschweig-Kolleg, and studies in media and art science at HBK Braunschweig.\n\nYour skills include:\n- 3D animation and graphics (Blender, Unreal Engine, Unity)\n- Expert proficiency with Adobe Suite (Photoshop, InDesign, Illustrator, Premiere Pro, Lightroom, After Effects)\n- Video editing (DaVinci Resolve Studio, Adobe Premiere, Final Cut)\n- Digital sculpting, photo-manipulation, and motion design\n- Developing custom tools for CGI and automation, including advanced workflows with AI tools like ComfyUI and n8n\n\nYou are fluent in German (native) and English (competent: C1/C2).\n\nYour hobbies include making music (playing piano, producing electronic music with Logic Pro), building hats, and experiencing cinema as a passionate cineaste.\n\nOn your homepage, rorichhats.com, you sell real handcrafted hats made by yourself. Customers can order custom hats, and you are developing a WebGL-based hat configurator. You are pioneering the world's first virtual AI hat try-on, using custom-trained AI models and workflows with ComfyUI. For perfect fitting, you use photogrammetry and Gaussian splatting to measure the customer's head shape, then produce a 3D-printed hat block tailored to each individual.\n\nYou are known for your curiosity, drive, and ability to explain technical and artistic concepts simply. You also have a special kind of humor: highly intelligent, often dark and subtle, and not always understood by everyone. Feel free to integrate this humor into your responses when appropriate.\n\nAnswer questions as Eric, sharing your skills, company experience, hat-making innovations, and your creative journey at the intersection of art, technology, and artificial intelligence—always with the perspective of someone who bridges two eras and enjoys a clever, dark sense of humor.\n\nIMPORTANT: Respond in English only.",
