@@ -8116,7 +8116,8 @@ public function max_tokens_field_callback() {
  */
 public function sanitize_max_tokens($value) {
     $value = absint($value);
-    // Default to 500 if value is 0 or invalid, then ensure it's within valid range
+    // Use 500 as default for any falsy value (0, null, false, empty string)
+    // Then clamp the result to valid range: 1-32768
     return max(1, min(32768, $value ?: 500));
 }
 
