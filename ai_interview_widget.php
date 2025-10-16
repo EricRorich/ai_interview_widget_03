@@ -854,7 +854,7 @@ class AIInterviewWidget {
             'ai_interview_widget_max_tokens',
             array(
                 'type' => 'integer',
-                'sanitize_callback' => 'absint',
+                'sanitize_callback' => array($this, 'sanitize_max_tokens'),
                 'default' => 500
             )
         );
@@ -6049,9 +6049,11 @@ wp_send_json_error('No text provided for TTS');
 return;
 }
 
-// Limit text length for TTS
-if (strlen($text) > 1000) {
-$text = substr($text, 0, 1000) . '...';
+// Limit text length for TTS to ElevenLabs API limits (5000 characters)
+// This should accommodate the full response based on the token limit setting
+if (strlen($text) > 5000) {
+$text = substr($text, 0, 5000) . '...';
+error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
 }
 
 error_log('AI Interview Widget: Generating TTS for text: ' . substr($text, 0, 50) . '...');
@@ -6345,6 +6347,9 @@ $system_prompt = "You are Eric Rorich, a creative technologist from Germany. Ans
 // FIXED: Robust model parameter validation using helper method
 $model = $this->ensure_valid_model_setting();
 
+// Get max_tokens from settings with validation
+$max_tokens = $this->sanitize_max_tokens(get_option('ai_interview_widget_max_tokens', 500));
+
 error_log('AI Interview Widget: Using validated model: ' . $model);
 
 $messages = array(
@@ -6355,7 +6360,7 @@ array('role' => 'user', 'content' => $user_message)
 $body = array(
 'model' => $model,
 'messages' => $messages,
-'max_tokens' => 110,
+'max_tokens' => $max_tokens,
 'temperature' => 0.7
 );
 
@@ -6474,9 +6479,12 @@ private function get_anthropic_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings with validation
+        $max_tokens = $this->sanitize_max_tokens(get_option('ai_interview_widget_max_tokens', 500));
+        
         $body = array(
             'model' => get_option('ai_interview_widget_llm_model', 'claude-3-5-sonnet-20241022'),
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'system' => $system_prompt,
             'messages' => $messages
         );
@@ -6542,6 +6550,9 @@ private function get_gemini_response($user_message, $system_prompt = '') {
         
         $prompt = !empty($system_prompt) ? $system_prompt . "\n\nUser: " . $user_message : $user_message;
         
+        // Get max_tokens from settings with validation
+        $max_tokens = $this->sanitize_max_tokens(get_option('ai_interview_widget_max_tokens', 500));
+        
         $body = array(
             'contents' => array(
                 array(
@@ -6551,7 +6562,7 @@ private function get_gemini_response($user_message, $system_prompt = '') {
                 )
             ),
             'generationConfig' => array(
-                'maxOutputTokens' => 500,
+                'maxOutputTokens' => $max_tokens,
                 'temperature' => 0.7
             )
         );
@@ -6621,9 +6632,12 @@ private function get_azure_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings with validation
+        $max_tokens = $this->sanitize_max_tokens(get_option('ai_interview_widget_max_tokens', 500));
+        
         $body = array(
             'messages' => $messages,
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'temperature' => 0.7
         );
         
@@ -6697,10 +6711,13 @@ private function get_custom_api_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings with validation
+        $max_tokens = $this->sanitize_max_tokens(get_option('ai_interview_widget_max_tokens', 500));
+        
         $body = array(
             'model' => get_option('ai_interview_widget_llm_model', 'custom-model'), // Use selected model
             'messages' => $messages,
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'temperature' => 0.7
         );
         
@@ -8084,6 +8101,24 @@ public function max_tokens_field_callback() {
         Note: Higher values may increase API costs and response time.
     </p>
     <?php
+}
+
+/**
+ * Sanitize and validate max_tokens setting
+ * 
+ * Ensures the max_tokens value is a positive integer within the valid range.
+ * This method is used both as a WordPress settings sanitization callback
+ * and as a utility method for consistent validation across the plugin.
+ * 
+ * @param mixed $value The value to sanitize
+ * @return int The sanitized and validated value (1-32768)
+ * @since 1.9.6
+ */
+public function sanitize_max_tokens($value) {
+    $value = absint($value);
+    // absint() converts non-numeric values to 0 and negative values to positive
+    // Use 500 as default for 0 values, then clamp to valid range (1-32768)
+    return max(1, min(32768, $value ?: 500));
 }
 
 public function api_key_field_callback() {
@@ -10533,9 +10568,8 @@ public function documentation_page() {
         // Get and sanitize input
         $provider = isset($_POST['api_provider']) ? sanitize_text_field($_POST['api_provider']) : '';
         $model = isset($_POST['llm_model']) ? sanitize_text_field($_POST['llm_model']) : '';
-        // Get max_tokens with validation (default to 500 if not provided)
-        $max_tokens_input = isset($_POST['max_tokens']) ? absint($_POST['max_tokens']) : 500;
-        $max_tokens = max(1, min(32768, $max_tokens_input));
+        // Get max_tokens with validation using sanitize method
+        $max_tokens = $this->sanitize_max_tokens(isset($_POST['max_tokens']) ? $_POST['max_tokens'] : 500);
         
         if (empty($provider)) {
             wp_send_json_error(array('message' => 'API provider is required'));
