@@ -54,9 +54,7 @@
             timeout: 5000
         },
         {
-            name: 'ipify+geojs',
-            // This is a two-step process: first get IP, then get location
-            // We'll use a simpler single-step approach with geojs.io
+            name: 'geojs.io',
             url: 'https://get.geojs.io/v1/ip/country.json',
             extractCountry: (data) => data.country || null,
             timeout: 5000
