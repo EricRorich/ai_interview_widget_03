@@ -40,20 +40,40 @@
     };
 
     // Country to language mapping for timezone-based detection
+    // Enhanced with more German-speaking regions for better coverage
     const TIMEZONE_TO_COUNTRY = {
+        // German-speaking timezones (Germany, Austria, Switzerland, Liechtenstein)
         'Europe/Berlin': 'DE',
-        'Europe/Vienna': 'DE',
-        'Europe/Zurich': 'DE',
-        'America/New_York': 'US',
-        'America/Los_Angeles': 'US',
-        'America/Chicago': 'US',
+        'Europe/Vienna': 'AT',  // Austria
+        'Europe/Zurich': 'CH',  // Switzerland
+        'Europe/Vaduz': 'LI',   // Liechtenstein
+        'Europe/Luxembourg': 'LU', // Luxembourg
+        
+        // Other European timezones
         'Europe/London': 'GB',
         'Europe/Paris': 'FR',
         'Europe/Madrid': 'ES',
         'Europe/Rome': 'IT',
+        'Europe/Brussels': 'BE',  // Belgium
+        'Europe/Amsterdam': 'NL', // Netherlands
+        
+        // US timezones
+        'America/New_York': 'US',
+        'America/Los_Angeles': 'US',
+        'America/Chicago': 'US',
+        'America/Denver': 'US',
+        'America/Phoenix': 'US',
+        
+        // Asian timezones
         'Asia/Tokyo': 'JP',
         'Asia/Shanghai': 'CN',
-        'Australia/Sydney': 'AU'
+        'Asia/Hong_Kong': 'HK',
+        'Asia/Singapore': 'SG',
+        
+        // Australian timezones
+        'Australia/Sydney': 'AU',
+        'Australia/Melbourne': 'AU',
+        'Australia/Perth': 'AU'
     };
 
     class AIWGeo {
@@ -66,29 +86,37 @@
 
         /**
          * Main public method: Get country code with caching and privacy controls
+         * Enhanced with detailed logging for debugging geolocation issues
+         * 
          * @param {Object} options - Override options for this request
          * @returns {Promise<string|null>} Country code (ISO 3166-1 alpha-2) or null
          */
         async getCountry(options = {}) {
             const requestConfig = { ...this.config, ...options };
             
-            this.debugLog('Getting country with config:', requestConfig);
+            this.debugLog('=== Getting country code ===');
+            this.debugLog('Config:', {
+                enabled: requestConfig.enabled,
+                useCache: requestConfig.useCache,
+                requireConsent: requestConfig.privacy.requireConsent,
+                fallbackToTimezone: requestConfig.fallbackToTimezone
+            });
 
             // Check if geolocation is disabled
             if (!requestConfig.enabled) {
-                this.debugLog('Geolocation disabled by configuration');
+                this.debugLog('✗ Geolocation disabled by configuration');
                 return null;
             }
 
             // Check privacy consent if required
             if (requestConfig.privacy.requireConsent && !this.hasConsent()) {
-                this.debugLog('Geolocation consent not granted');
+                this.debugLog('✗ Geolocation consent not granted');
                 return null;
             }
 
             // Try server-provided country first
             if (requestConfig.serverCountry) {
-                this.debugLog('Using server-provided country:', requestConfig.serverCountry);
+                this.debugLog('✓ Using server-provided country:', requestConfig.serverCountry);
                 return requestConfig.serverCountry.toUpperCase();
             }
 
@@ -96,49 +124,61 @@
             if (requestConfig.useCache) {
                 const cachedCountry = this.getCachedCountry();
                 if (cachedCountry) {
-                    this.debugLog('Using cached country:', cachedCountry);
+                    this.debugLog('✓ Using cached country:', cachedCountry);
                     return cachedCountry;
                 }
+                this.debugLog('ℹ No valid cached country found');
             }
 
             // Attempt network-based detection
             try {
+                this.debugLog('Attempting network-based country detection...');
                 const networkCountry = await this.detectCountryFromNetwork(requestConfig);
                 if (networkCountry) {
                     // Cache the result
                     if (requestConfig.useCache) {
                         this.setCachedCountry(networkCountry);
+                        this.debugLog('✓ Cached country for future requests');
                     }
-                    this.debugLog('Successfully detected country from network:', networkCountry);
+                    this.debugLog('✓ Successfully detected country from network:', networkCountry);
                     return networkCountry;
                 }
             } catch (error) {
                 this.errorLog('Network country detection failed:', error.message);
+                this.debugLog('Falling back to alternative methods...');
             }
 
             // Fallback to timezone-based detection
             if (requestConfig.fallbackToTimezone) {
+                this.debugLog('Attempting timezone-based country detection...');
                 const timezoneCountry = this.detectCountryFromTimezone();
                 if (timezoneCountry) {
-                    this.debugLog('Using timezone-based country:', timezoneCountry);
+                    this.debugLog('✓ Using timezone-based country:', timezoneCountry);
                     return timezoneCountry;
                 }
+                this.debugLog('✗ Timezone detection did not yield a country');
             }
 
-            this.debugLog('All country detection methods failed');
+            this.debugLog('✗ All country detection methods failed');
             return null;
         }
 
         /**
          * Detect country from network (single provider approach)
+         * Uses ip-api.com for IP geolocation with enhanced error handling
+         * 
+         * @param {Object} config Configuration options
+         * @returns {Promise<string|null>} ISO 3166-1 alpha-2 country code or null
          */
         async detectCountryFromNetwork(config) {
-            this.debugLog('Attempting network-based country detection...');
+            this.debugLog('Attempting network-based country detection using', PRIMARY_SERVICE.name);
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), config.networkTimeoutMs);
 
             try {
+                this.debugLog('Fetching from:', PRIMARY_SERVICE.url);
+                
                 const response = await fetch(PRIMARY_SERVICE.url, {
                     method: 'GET',
                     signal: controller.signal,
@@ -155,25 +195,32 @@
                 }
 
                 const data = await response.json();
+                this.debugLog('Received data from IP-API:', data);
+                
                 const country = PRIMARY_SERVICE.extractCountry(data);
 
                 if (country && typeof country === 'string' && /^[A-Z]{2}$/.test(country)) {
+                    this.debugLog('✓ Successfully detected country:', country);
                     return country;
                 }
 
-                throw new Error('Invalid country code format received');
+                throw new Error('Invalid country code format received: ' + JSON.stringify(country));
 
             } catch (error) {
                 clearTimeout(timeoutId);
                 
                 // Handle specific error types quietly
                 if (error.name === 'AbortError') {
+                    this.debugLog('✗ Network timeout after', config.networkTimeoutMs, 'ms');
                     throw new Error('Network timeout');
                 } else if (error.name === 'TypeError' && error.message.includes('CORS')) {
+                    this.debugLog('✗ CORS policy blocked request');
                     throw new Error('CORS policy blocked request');
                 } else if (error.name === 'TypeError') {
+                    this.debugLog('✗ Network connectivity issue');
                     throw new Error('Network connectivity issue');
                 } else {
+                    this.debugLog('✗ Error:', error.message);
                     throw error;
                 }
             }
