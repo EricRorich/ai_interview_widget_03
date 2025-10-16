@@ -6049,9 +6049,11 @@ wp_send_json_error('No text provided for TTS');
 return;
 }
 
-// Limit text length for TTS
-if (strlen($text) > 1000) {
-$text = substr($text, 0, 1000) . '...';
+// Limit text length for TTS to ElevenLabs API limits (5000 characters)
+// This should accommodate the full response based on the token limit setting
+if (strlen($text) > 5000) {
+$text = substr($text, 0, 5000) . '...';
+error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
 }
 
 error_log('AI Interview Widget: Generating TTS for text: ' . substr($text, 0, 50) . '...');
@@ -6345,6 +6347,10 @@ $system_prompt = "You are Eric Rorich, a creative technologist from Germany. Ans
 // FIXED: Robust model parameter validation using helper method
 $model = $this->ensure_valid_model_setting();
 
+// Get max_tokens from settings
+$max_tokens = absint(get_option('ai_interview_widget_max_tokens', 500));
+$max_tokens = max(1, min(32768, $max_tokens));
+
 error_log('AI Interview Widget: Using validated model: ' . $model);
 
 $messages = array(
@@ -6355,7 +6361,7 @@ array('role' => 'user', 'content' => $user_message)
 $body = array(
 'model' => $model,
 'messages' => $messages,
-'max_tokens' => 110,
+'max_tokens' => $max_tokens,
 'temperature' => 0.7
 );
 
@@ -6474,9 +6480,13 @@ private function get_anthropic_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings
+        $max_tokens = absint(get_option('ai_interview_widget_max_tokens', 500));
+        $max_tokens = max(1, min(32768, $max_tokens));
+        
         $body = array(
             'model' => get_option('ai_interview_widget_llm_model', 'claude-3-5-sonnet-20241022'),
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'system' => $system_prompt,
             'messages' => $messages
         );
@@ -6542,6 +6552,10 @@ private function get_gemini_response($user_message, $system_prompt = '') {
         
         $prompt = !empty($system_prompt) ? $system_prompt . "\n\nUser: " . $user_message : $user_message;
         
+        // Get max_tokens from settings
+        $max_tokens = absint(get_option('ai_interview_widget_max_tokens', 500));
+        $max_tokens = max(1, min(32768, $max_tokens));
+        
         $body = array(
             'contents' => array(
                 array(
@@ -6551,7 +6565,7 @@ private function get_gemini_response($user_message, $system_prompt = '') {
                 )
             ),
             'generationConfig' => array(
-                'maxOutputTokens' => 500,
+                'maxOutputTokens' => $max_tokens,
                 'temperature' => 0.7
             )
         );
@@ -6621,9 +6635,13 @@ private function get_azure_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings
+        $max_tokens = absint(get_option('ai_interview_widget_max_tokens', 500));
+        $max_tokens = max(1, min(32768, $max_tokens));
+        
         $body = array(
             'messages' => $messages,
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'temperature' => 0.7
         );
         
@@ -6697,10 +6715,14 @@ private function get_custom_api_response($user_message, $system_prompt = '') {
             array('role' => 'user', 'content' => $user_message)
         );
         
+        // Get max_tokens from settings
+        $max_tokens = absint(get_option('ai_interview_widget_max_tokens', 500));
+        $max_tokens = max(1, min(32768, $max_tokens));
+        
         $body = array(
             'model' => get_option('ai_interview_widget_llm_model', 'custom-model'), // Use selected model
             'messages' => $messages,
-            'max_tokens' => 500,
+            'max_tokens' => $max_tokens,
             'temperature' => 0.7
         );
         
