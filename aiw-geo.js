@@ -1,10 +1,22 @@
 /**
  * AI Interview Widget - Geolocation Module (aiw-geo.js)
- * Version: 1.9.4+
+ * Version: 1.9.6+
  * 
  * Privacy-conscious, resilient geolocation abstraction layer
- * Eliminates noisy CORS errors from multiple IP services
+ * Uses multiple geolocation providers with automatic fallback for maximum reliability
+ * Eliminates 403/CORS errors by trying multiple services
  * Provides caching, opt-out mechanisms, and graceful fallbacks
+ * 
+ * Geolocation Providers (in order of preference):
+ * 1. ipapi.co - Free tier with excellent CORS support
+ * 2. geojs.io - Completely free, no rate limits
+ * 3. ip-api.com - Fallback option
+ * 
+ * Fallback Strategy:
+ * - Network providers (tries all in sequence)
+ * - Timezone-based detection
+ * - Browser language preference
+ * - Default to English
  */
 
 (function(window) {
@@ -32,12 +44,28 @@
         consent: 'aiw_geo_consent'
     };
 
-    // Primary geolocation service (single provider approach)
-    const PRIMARY_SERVICE = {
-        url: 'https://ip-api.com/json/?fields=status,countryCode',
-        extractCountry: (data) => data.status === 'success' ? data.countryCode : null,
-        name: 'IP-API'
-    };
+    // Multiple geolocation providers for reliability
+    // Using a cascading approach with fallbacks for maximum reliability
+    const GEOLOCATION_PROVIDERS = [
+        {
+            name: 'ipapi.co',
+            url: 'https://ipapi.co/json/',
+            extractCountry: (data) => data.country_code || data.country || null,
+            timeout: 5000
+        },
+        {
+            name: 'geojs.io',
+            url: 'https://get.geojs.io/v1/ip/country.json',
+            extractCountry: (data) => data.country || null,
+            timeout: 5000
+        },
+        {
+            name: 'ip-api.com',
+            url: 'https://ip-api.com/json/?fields=status,countryCode',
+            extractCountry: (data) => data.status === 'success' ? data.countryCode : null,
+            timeout: 5000
+        }
+    ];
 
     // Country to language mapping for timezone-based detection
     // Enhanced with more German-speaking regions for better coverage
@@ -164,63 +192,120 @@
         }
 
         /**
-         * Detect country from network (single provider approach)
-         * Uses ip-api.com for IP geolocation with enhanced error handling
+         * Detect country from network using multiple providers with automatic fallback
+         * Tries providers in order until one succeeds, providing maximum reliability
+         * 
+         * Providers tried in order:
+         * 1. ipapi.co - Free tier with good CORS support
+         * 2. geojs.io - Completely free, no rate limits
+         * 3. ip-api.com - Fallback option
          * 
          * @param {Object} config Configuration options
          * @returns {Promise<string|null>} ISO 3166-1 alpha-2 country code or null
          */
         async detectCountryFromNetwork(config) {
-            this.debugLog('Attempting network-based country detection using', PRIMARY_SERVICE.name);
+            this.debugLog('Starting multi-provider network-based country detection');
 
+            // Try each provider in sequence until one succeeds
+            for (let i = 0; i < GEOLOCATION_PROVIDERS.length; i++) {
+                const provider = GEOLOCATION_PROVIDERS[i];
+                
+                try {
+                    this.debugLog(`Trying provider ${i + 1}/${GEOLOCATION_PROVIDERS.length}:`, provider.name);
+                    
+                    const country = await this.tryGeolocationProvider(provider, config);
+                    
+                    if (country) {
+                        this.debugLog(`✓ Successfully detected country from ${provider.name}:`, country);
+                        return country;
+                    }
+                    
+                    this.debugLog(`✗ Provider ${provider.name} returned no country, trying next...`);
+                    
+                } catch (error) {
+                    this.debugLog(`✗ Provider ${provider.name} failed:`, error.message);
+                    
+                    // If this is not the last provider, continue to the next one
+                    if (i < GEOLOCATION_PROVIDERS.length - 1) {
+                        this.debugLog('Falling back to next provider...');
+                        continue;
+                    }
+                    
+                    // If this was the last provider, throw the error
+                    this.debugLog('All geolocation providers failed');
+                    throw new Error('All geolocation providers failed');
+                }
+            }
+            
+            // If we get here, all providers returned null
+            this.debugLog('✗ All providers returned null, no country detected');
+            return null;
+        }
+
+        /**
+         * Try a single geolocation provider
+         * 
+         * @param {Object} provider Provider configuration
+         * @param {Object} config Request configuration
+         * @returns {Promise<string|null>} Country code or null
+         */
+        async tryGeolocationProvider(provider, config) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), config.networkTimeoutMs);
+            const timeout = provider.timeout || config.networkTimeoutMs;
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
 
             try {
-                this.debugLog('Fetching from:', PRIMARY_SERVICE.url);
+                this.debugLog('Fetching from:', provider.url);
                 
-                const response = await fetch(PRIMARY_SERVICE.url, {
+                const response = await fetch(provider.url, {
                     method: 'GET',
                     signal: controller.signal,
                     headers: {
                         'Accept': 'application/json'
                     },
-                    mode: 'cors' // Explicit CORS mode
+                    mode: 'cors',
+                    cache: 'no-cache' // Prevent stale cached responses
                 });
 
                 clearTimeout(timeoutId);
 
+                // Handle HTTP errors
                 if (!response.ok) {
+                    // Special handling for 403 errors (common CORS/rate limit issue)
+                    if (response.status === 403) {
+                        throw new Error(`Provider blocked request (403 Forbidden) - likely CORS or rate limit`);
+                    }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
-                this.debugLog('Received data from IP-API:', data);
+                this.debugLog('Received data from', provider.name, ':', data);
                 
-                const country = PRIMARY_SERVICE.extractCountry(data);
+                const country = provider.extractCountry(data);
 
-                if (country && typeof country === 'string' && /^[A-Z]{2}$/.test(country)) {
-                    this.debugLog('✓ Successfully detected country:', country);
-                    return country;
+                // Validate country code format (ISO 3166-1 alpha-2)
+                if (country && typeof country === 'string' && /^[A-Z]{2}$/i.test(country)) {
+                    // Ensure uppercase
+                    return country.toUpperCase();
                 }
 
-                throw new Error('Invalid country code format received: ' + JSON.stringify(country));
+                // Invalid or missing country code
+                this.debugLog('Invalid country code format from', provider.name, ':', country);
+                return null;
 
             } catch (error) {
                 clearTimeout(timeoutId);
                 
-                // Handle specific error types quietly
+                // Categorize errors for better debugging
                 if (error.name === 'AbortError') {
-                    this.debugLog('✗ Network timeout after', config.networkTimeoutMs, 'ms');
-                    throw new Error('Network timeout');
-                } else if (error.name === 'TypeError' && error.message.includes('CORS')) {
-                    this.debugLog('✗ CORS policy blocked request');
+                    throw new Error(`Timeout after ${timeout}ms`);
+                } else if (error.message.includes('403')) {
+                    throw new Error('403 Forbidden - CORS or rate limit issue');
+                } else if (error.message.includes('CORS') || error.message.includes('cors')) {
                     throw new Error('CORS policy blocked request');
-                } else if (error.name === 'TypeError') {
-                    this.debugLog('✗ Network connectivity issue');
+                } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
                     throw new Error('Network connectivity issue');
                 } else {
-                    this.debugLog('✗ Error:', error.message);
                     throw error;
                 }
             }
