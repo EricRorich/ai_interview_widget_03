@@ -7151,9 +7151,15 @@ private function get_system_prompt_from_settings($lang_code = 'en') {
     $content_settings = get_option('ai_interview_widget_content_settings', '');
     $content_data = json_decode($content_settings, true);
     
+    // Check for JSON decode errors or invalid data
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($content_data)) {
+        error_log('AI Interview Widget: Invalid JSON in content settings, using default prompt');
+        return $this->get_default_system_prompt($lang_code);
+    }
+    
     // Try to get saved prompt for the specified language
     $prompt_key = 'Systemprompts_Placeholder_' . $lang_code;
-    if (!empty($content_data[$prompt_key])) {
+    if (isset($content_data[$prompt_key]) && !empty($content_data[$prompt_key])) {
         return $content_data[$prompt_key];
     }
     
