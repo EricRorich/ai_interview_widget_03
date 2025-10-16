@@ -172,11 +172,28 @@ Debug logs include:
 
 ### Debug Test Page
 
-A test page is provided at `/tmp/geolocation-test.html`:
+To create a test page for geolocation debugging, create an HTML file with the following structure:
 
-```bash
-# Open in browser to test geolocation
-open /tmp/geolocation-test.html
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Geolocation Test</title>
+</head>
+<body>
+    <h1>Geolocation Test</h1>
+    <div id="results"></div>
+    
+    <script src="path/to/aiw-geo.js"></script>
+    <script>
+        // Test geolocation
+        window.AIWGeo.getCountry().then(country => {
+            document.getElementById('results').innerHTML = 
+                'Detected Country: ' + (country || 'None');
+        });
+    </script>
+</body>
+</html>
 ```
 
 ### Browser Console Testing
