@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let isListening = false;
     let ttsEnabled = true;
     let currentTTSAudio = null;
+    let isTTSPlaying = false; // Track if TTS is currently playing to prevent microphone overlap
 
     // Voice Activity Detection (VAD) configuration
     let vadEnabled = true;
@@ -757,7 +758,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Voice input button
             voiceInputBtn.addEventListener('click', function() {
-                if (!isListening && speechRecognition) {
+                // Prevent starting voice input if already listening or if TTS is playing
+                if (isListening) {
+                    debug("Voice input button clicked but already listening");
+                    return;
+                }
+                
+                if (isTTSPlaying) {
+                    debug("Voice input button clicked but TTS is playing - blocking");
+                    const language = detectedLanguage || 'en';
+                    const blockedMessages = {
+                        'en': 'Please wait for the voice output to finish...',
+                        'de': 'Bitte warten Sie, bis die Sprachausgabe beendet ist...'
+                    };
+                    showVoiceStatus(blockedMessages[language], 'error');
+                    setTimeout(() => {
+                        hideVoiceStatus();
+                    }, 2000);
+                    return;
+                }
+                
+                if (speechRecognition) {
                     startVoiceInput();
                 }
             });
@@ -831,6 +852,22 @@ document.addEventListener('DOMContentLoaded', function() {
         function startVoiceInput() {
             if (!speechRecognition || isListening) return;
 
+            // CRITICAL: Prevent microphone from starting while TTS is playing
+            // This ensures the microphone never records the chatbot's voice output
+            if (isTTSPlaying) {
+                debug("Voice input blocked - TTS is currently playing");
+                const language = detectedLanguage || 'en';
+                const blockedMessages = {
+                    'en': 'Please wait for the voice output to finish...',
+                    'de': 'Bitte warten Sie, bis die Sprachausgabe beendet ist...'
+                };
+                showVoiceStatus(blockedMessages[language], 'error');
+                setTimeout(() => {
+                    hideVoiceStatus();
+                }, 2000);
+                return;
+            }
+
             debug("Starting voice input with VAD");
 
             // Set language if detected
@@ -839,7 +876,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 speechRecognition.lang = speechLang;
             }
 
-            // Stop any current TTS playback
+            // Stop any current TTS playback (defensive, should already be stopped)
             stopCurrentTTS();
 
             // Clear current input
@@ -996,11 +1033,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 utterance.onend = function() {
                     debug("Fallback TTS completed");
+                    isTTSPlaying = false;
+                    updateVoiceInputAvailability();
                     resolve('fallback');
                 };
 
                 utterance.onerror = function(event) {
                     debug("Fallback TTS error:", event);
+                    isTTSPlaying = false;
+                    updateVoiceInputAvailability();
                     reject(new Error("Fallback TTS failed"));
                 };
 
@@ -1022,6 +1063,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (audioUrl === 'fallback') {
                     // Fallback TTS is already playing
+                    // Mark TTS as playing for fallback as well
+                    isTTSPlaying = true;
+                    updateVoiceInputAvailability();
                     return;
                 }
 
@@ -1029,22 +1073,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentTTSAudio = new Audio(audioUrl);
                 currentTTSAudio.onended = function() {
                     currentTTSAudio = null;
+                    isTTSPlaying = false;
+                    updateVoiceInputAvailability();
                     debug("TTS playback completed");
                 };
 
                 currentTTSAudio.onerror = function(error) {
                     debug("TTS playback error:", error);
                     currentTTSAudio = null;
+                    isTTSPlaying = false;
+                    updateVoiceInputAvailability();
                 };
 
                 // Integrate audio visualization for TTS playback BEFORE playing
                 attachAudioVisualization(currentTTSAudio);
 
                 await currentTTSAudio.play();
+                isTTSPlaying = true;
+                updateVoiceInputAvailability();
                 debug("TTS playback started");
 
             } catch (error) {
                 debug("TTS playback failed:", error);
+                isTTSPlaying = false;
+                updateVoiceInputAvailability();
             }
         }
 
@@ -1060,6 +1112,36 @@ document.addEventListener('DOMContentLoaded', function() {
             if (speechSynthesis && speechSynthesis.speaking) {
                 speechSynthesis.cancel();
                 debug("Stopped fallback TTS");
+            }
+            
+            // Clear TTS playing state and re-enable voice input
+            isTTSPlaying = false;
+            updateVoiceInputAvailability();
+        }
+
+        /**
+         * Update voice input button availability based on TTS playback state
+         * Prevents microphone recording from starting while chatbot is talking
+         */
+        function updateVoiceInputAvailability() {
+            if (!voiceInputBtn) return;
+            
+            if (isTTSPlaying) {
+                // Disable voice input while TTS is playing
+                voiceInputBtn.disabled = true;
+                voiceInputBtn.classList.add('disabled-during-tts');
+                voiceInputBtn.title = detectedLanguage === 'de' 
+                    ? 'Warten, bis die Sprachausgabe beendet ist...' 
+                    : 'Waiting for voice output to finish...';
+                debug("Voice input disabled - TTS is playing");
+            } else {
+                // Enable voice input when TTS finishes
+                voiceInputBtn.disabled = false;
+                voiceInputBtn.classList.remove('disabled-during-tts');
+                voiceInputBtn.title = detectedLanguage === 'de' 
+                    ? 'Spracheingabe starten' 
+                    : 'Start voice input';
+                debug("Voice input enabled - TTS finished");
             }
         }
 
@@ -1091,9 +1173,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     playTTS(messageText).then(() => {
                         ttsButton.classList.remove('playing');
                         ttsButton.innerHTML = '🔊';
+                        // Ensure state is cleared when TTS finishes via button
+                        isTTSPlaying = false;
+                        updateVoiceInputAvailability();
                     }).catch(() => {
                         ttsButton.classList.remove('playing');
                         ttsButton.innerHTML = '🔊';
+                        // Ensure state is cleared on error
+                        isTTSPlaying = false;
+                        updateVoiceInputAvailability();
                     });
                 }
             });
