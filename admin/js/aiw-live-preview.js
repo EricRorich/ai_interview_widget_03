@@ -79,6 +79,12 @@
                 canvas.css('background-color', canvasColor);
             }
 
+            // Canvas border radius
+            const canvasBorderRadius = $('#canvas_border_radius_slider').val();
+            if (canvasBorderRadius) {
+                canvas.css('border-radius', canvasBorderRadius + 'px');
+            }
+
             // Canvas shadow color
             const shadowColor = $('#canvas_shadow_color').val();
             const shadowIntensity = $('#canvas_shadow_intensity_slider').val() || 30;
@@ -117,12 +123,30 @@
                     'height': buttonSize + 'px',
                     'font-size': 'calc(' + buttonSize + 'px * 0.4)'
                 });
+                // Also update the icon size
+                button.find('.dashicons').css({
+                    'width': (buttonSize * 0.4) + 'px',
+                    'height': (buttonSize * 0.4) + 'px',
+                    'font-size': (buttonSize * 0.4) + 'px'
+                });
             }
 
-            // Button color
+            // Button design (determines background style)
+            const design = $('#play_button_design').val();
             const buttonColor = $('#play_button_color').val();
-            if (buttonColor) {
-                button.css('background', buttonColor);
+            
+            if (design === 'classic') {
+                // Gradient style
+                const gradientStart = $('#play_button_gradient_start').val();
+                const gradientEnd = $('#play_button_gradient_end').val();
+                if (gradientStart && gradientEnd) {
+                    button.css('background', 'radial-gradient(circle, ' + gradientStart + ' 0%, ' + gradientEnd + ' 100%)');
+                }
+            } else if (design === 'minimalist' || design === 'futuristic') {
+                // Solid color
+                if (buttonColor) {
+                    button.css('background', buttonColor);
+                }
             }
 
             // Button icon color
@@ -132,9 +156,9 @@
             }
 
             // Button border
-            const borderWidth = $('#button_border_width_slider').val();
-            const borderColor = $('#button_border_color').val();
-            if (borderWidth && borderColor) {
+            const borderWidth = $('#play_button_border_width_slider').val();
+            const borderColor = $('#play_button_border_color').val();
+            if (borderWidth !== undefined && borderColor) {
                 button.css('border', borderWidth + 'px solid ' + borderColor);
             }
         }
@@ -180,6 +204,25 @@
                     $('#gradient_colors_group').show();
                 }
                 updateContainerStyles();
+            });
+
+            // Play button design type
+            $('#play_button_design').on('change', function() {
+                const design = $(this).val();
+                
+                // Show/hide appropriate controls
+                if (design === 'classic') {
+                    $('#play_button_gradient_group').show();
+                    $('#play_button_neon_group').hide();
+                } else if (design === 'futuristic') {
+                    $('#play_button_gradient_group').hide();
+                    $('#play_button_neon_group').show();
+                } else {
+                    $('#play_button_gradient_group').hide();
+                    $('#play_button_neon_group').hide();
+                }
+                
+                updateButtonStyles();
             });
 
             // Color pickers - use wpColorPicker change event
