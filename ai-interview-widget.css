@@ -384,6 +384,27 @@
     color: #999 !important;
 }
 
+/* Voice button disabled during TTS playback to prevent microphone recording chatbot voice */
+.voice-btn.disabled-during-tts {
+    opacity: 0.6 !important;
+    cursor: wait !important;
+    background: rgba(255, 165, 0, 0.15) !important;
+    border-color: #ff8c00 !important;
+    color: #ffa500 !important;
+    animation: pulse-waiting 2s ease-in-out infinite !important;
+}
+
+@keyframes pulse-waiting {
+    0%, 100% {
+        opacity: 0.6;
+        box-shadow: 0 0 5px rgba(255, 140, 0, 0.3);
+    }
+    50% {
+        opacity: 0.8;
+        box-shadow: 0 0 15px rgba(255, 140, 0, 0.5);
+    }
+}
+
 .voice-btn.active {
     background: rgba(0, 255, 127, 0.3) !important;
     border-color: #00ff7f !important;
