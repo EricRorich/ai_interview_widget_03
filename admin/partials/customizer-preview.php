@@ -65,6 +65,11 @@ $play_button_icon_color = isset($style_settings['play_button_icon_color']) ? $st
 $play_button_border_width = isset($style_settings['play_button_border_width']) ? $style_settings['play_button_border_width'] : 2;
 $play_button_border_color = isset($style_settings['play_button_border_color']) ? $style_settings['play_button_border_color'] : '#00cfff';
 
+$visualizer_primary_color = isset($style_settings['visualizer_primary_color']) ? $style_settings['visualizer_primary_color'] : '#00cfff';
+$visualizer_bar_width = isset($style_settings['visualizer_bar_width']) ? $style_settings['visualizer_bar_width'] : 2;
+$visualizer_bar_spacing = isset($style_settings['visualizer_bar_spacing']) ? $style_settings['visualizer_bar_spacing'] : 3;
+$visualizer_glow_intensity = isset($style_settings['visualizer_glow_intensity']) ? $style_settings['visualizer_glow_intensity'] : 8;
+
 $headline_text = isset($content_settings['headline_text']) ? $content_settings['headline_text'] : 'Ask Eric';
 $headline_font_size = isset($content_settings['headline_font_size']) ? $content_settings['headline_font_size'] : 18;
 $headline_color = isset($content_settings['headline_color']) ? $content_settings['headline_color'] : '#ffffff';
@@ -151,7 +156,7 @@ if ($canvas_shadow_intensity > 0) {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 3px;
+            gap: <?php echo esc_attr($visualizer_bar_spacing); ?>px;
             padding: 10px;
             box-sizing: border-box;
         ">
@@ -159,12 +164,14 @@ if ($canvas_shadow_intensity > 0) {
             <?php for ($i = 0; $i < 12; $i++): 
                 $height = rand(15, 45);
                 $delay = $i * 0.1;
+                $glow = $visualizer_glow_intensity > 0 ? '0 0 ' . $visualizer_glow_intensity . 'px ' . $visualizer_primary_color : 'none';
             ?>
             <div class="preview-viz-bar" style="
-                width: 3px;
+                width: <?php echo esc_attr($visualizer_bar_width); ?>px;
                 height: <?php echo $height; ?>px;
-                background: <?php echo esc_attr($play_button_color); ?>;
+                background: <?php echo esc_attr($visualizer_primary_color); ?>;
                 border-radius: 2px;
+                box-shadow: <?php echo $glow; ?>;
                 animation: pulse 1s ease-in-out <?php echo $delay; ?>s infinite alternate;
             "></div>
             <?php endfor; ?>

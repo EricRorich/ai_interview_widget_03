@@ -22,6 +22,42 @@
         }
 
         /**
+         * Update visualization bars in preview
+         */
+        function updateVisualizationBars() {
+            const bars = $('.preview-viz-bar');
+            if (!bars.length) return;
+
+            // Bar width
+            const barWidth = $('#visualizer_bar_width_slider').val();
+            if (barWidth) {
+                bars.css('width', barWidth + 'px');
+            }
+
+            // Bar spacing (update parent container gap)
+            const barSpacing = $('#visualizer_bar_spacing_slider').val();
+            if (barSpacing) {
+                $('.aiw-preview-canvas').css('gap', barSpacing + 'px');
+            }
+
+            // Bar color
+            const barColor = $('#visualizer_primary_color').val();
+            if (barColor) {
+                bars.css('background', barColor);
+            }
+
+            // Glow intensity
+            const glowIntensity = $('#visualizer_glow_intensity_slider').val();
+            if (glowIntensity !== undefined) {
+                if (glowIntensity > 0 && barColor) {
+                    bars.css('box-shadow', '0 0 ' + glowIntensity + 'px ' + barColor);
+                } else {
+                    bars.css('box-shadow', 'none');
+                }
+            }
+        }
+
+        /**
          * Update preview with current settings
          */
         function updatePreview() {
@@ -36,6 +72,9 @@
             
             // Text styles
             updateTextStyles();
+            
+            // Visualization bars
+            updateVisualizationBars();
         }
 
         /**
