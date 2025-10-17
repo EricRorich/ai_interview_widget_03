@@ -6085,6 +6085,10 @@ public function sanitize_elevenlabs_voice_speed($speed) {
 
 /**
  * Sanitize ElevenLabs stability parameter
+ * 
+ * @param mixed $stability The stability value to sanitize
+ * @return float The sanitized stability value (0.0-1.0)
+ * @since 1.9.6
  */
 public function sanitize_elevenlabs_stability($stability) {
     // Convert to float
@@ -6102,6 +6106,10 @@ public function sanitize_elevenlabs_stability($stability) {
 
 /**
  * Sanitize ElevenLabs similarity boost parameter
+ * 
+ * @param mixed $similarity The similarity boost value to sanitize
+ * @return float The sanitized similarity boost value (0.0-1.0)
+ * @since 1.9.6
  */
 public function sanitize_elevenlabs_similarity($similarity) {
     // Convert to float
@@ -6119,6 +6127,10 @@ public function sanitize_elevenlabs_similarity($similarity) {
 
 /**
  * Sanitize ElevenLabs style exaggeration parameter
+ * 
+ * @param mixed $style The style exaggeration value to sanitize
+ * @return float The sanitized style exaggeration value (0.0-1.0)
+ * @since 1.9.6
  */
 public function sanitize_elevenlabs_style($style) {
     // Convert to float
