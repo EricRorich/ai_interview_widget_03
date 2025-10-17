@@ -155,7 +155,7 @@ Remove visual feedback
 ## Future Enhancements
 
 Potential improvements for future versions:
-1. Visual countdown timer showing TTS remaining time
+1. Visual progress indicator for TTS playback (if duration available)
 2. Queue system for multiple TTS requests
 3. User preference for blocking behavior
 4. Accessibility improvements (screen reader announcements)

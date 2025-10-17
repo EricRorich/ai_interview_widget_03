@@ -215,7 +215,7 @@ To access debug information during testing, open browser console and check for:
 
 ## Known Issues to Watch For
 
-1. **Race Condition**: Very rapid clicks might bypass blocking - verify with rapid clicking
+1. **Race Condition**: The implementation includes double-checking in both the button click handler and `startVoiceInput()` to prevent rapid clicks (clicks within 100ms) from bypassing blocking. Expected behavior: All click attempts during TTS should be blocked, regardless of timing. If a click somehow bypasses the first check, the second check in `startVoiceInput()` will catch it.
 2. **State Stuck**: Button never re-enables - check TTS error handling
 3. **Network Issues**: Slow TTS loading might affect timing - test on slow connection
 4. **Browser Differences**: Some browsers handle TTS differently - test comprehensively
