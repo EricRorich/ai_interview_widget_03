@@ -37,7 +37,7 @@
             // Bar spacing (update parent container gap)
             const barSpacing = $('#visualizer_bar_spacing_slider').val();
             if (barSpacing) {
-                $('.aiw-preview-canvas').css('gap', barSpacing + 'px');
+                $('#previewSoundbar').css('gap', barSpacing + 'px');
             }
 
             // Bar color
