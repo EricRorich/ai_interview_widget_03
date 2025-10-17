@@ -495,6 +495,9 @@
                     data.elevenlabs_voice_id = $('input[name="ai_interview_widget_elevenlabs_voice_id"]').val();
                     data.voice_quality = $('select[name="ai_interview_widget_voice_quality"]').val();
                     data.elevenlabs_voice_speed = $('input[name="ai_interview_widget_elevenlabs_voice_speed"]').val();
+                    data.elevenlabs_stability = $('input[name="ai_interview_widget_elevenlabs_stability"]').val();
+                    data.elevenlabs_similarity = $('input[name="ai_interview_widget_elevenlabs_similarity"]').val();
+                    data.elevenlabs_style = $('input[name="ai_interview_widget_elevenlabs_style"]').val();
                     data.enable_voice = $('input[name="ai_interview_widget_enable_voice"]').is(':checked') ? 1 : 0;
                     data.disable_greeting_audio = $('input[name="ai_interview_widget_disable_greeting_audio"]').is(':checked') ? 1 : 0;
                     data.disable_audio_visualization = $('input[name="ai_interview_widget_disable_audio_visualization"]').is(':checked') ? 1 : 0;

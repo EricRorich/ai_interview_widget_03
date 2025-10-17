@@ -805,6 +805,36 @@ class AIInterviewWidget {
             )
         );
         
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_elevenlabs_stability',
+            array(
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_elevenlabs_stability'),
+                'default' => 0.5
+            )
+        );
+        
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_elevenlabs_similarity',
+            array(
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_elevenlabs_similarity'),
+                'default' => 0.8
+            )
+        );
+        
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_elevenlabs_style',
+            array(
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_elevenlabs_style'),
+                'default' => 0.0
+            )
+        );
+        
         // Audio Control Settings
         register_setting(
             $settings_group,
@@ -1165,6 +1195,30 @@ class AIInterviewWidget {
             'elevenlabs_voice_speed',
             'Voice Speed',
             array($this, 'elevenlabs_voice_speed_field_callback'),
+            'ai-interview-widget',
+            'ai_interview_widget_elevenlabs_section'
+        );
+
+        add_settings_field(
+            'elevenlabs_stability',
+            'Stability',
+            array($this, 'elevenlabs_stability_field_callback'),
+            'ai-interview-widget',
+            'ai_interview_widget_elevenlabs_section'
+        );
+
+        add_settings_field(
+            'elevenlabs_similarity',
+            'Similarity Boost',
+            array($this, 'elevenlabs_similarity_field_callback'),
+            'ai-interview-widget',
+            'ai_interview_widget_elevenlabs_section'
+        );
+
+        add_settings_field(
+            'elevenlabs_style',
+            'Style Exaggeration',
+            array($this, 'elevenlabs_style_field_callback'),
             'ai-interview-widget',
             'ai_interview_widget_elevenlabs_section'
         );
@@ -6030,6 +6084,69 @@ public function sanitize_elevenlabs_voice_speed($speed) {
 }
 
 /**
+ * Sanitize ElevenLabs stability parameter
+ * 
+ * @param mixed $stability The stability value to sanitize
+ * @return float The sanitized stability value (0.0-1.0)
+ * @since 1.9.6
+ */
+public function sanitize_elevenlabs_stability($stability) {
+    // Convert to float
+    $stability = floatval($stability);
+    
+    // Ensure stability is within ElevenLabs API limits (0.0 to 1.0)
+    if ($stability < 0.0) {
+        $stability = 0.0;
+    } elseif ($stability > 1.0) {
+        $stability = 1.0;
+    }
+    
+    return $stability;
+}
+
+/**
+ * Sanitize ElevenLabs similarity boost parameter
+ * 
+ * @param mixed $similarity The similarity boost value to sanitize
+ * @return float The sanitized similarity boost value (0.0-1.0)
+ * @since 1.9.6
+ */
+public function sanitize_elevenlabs_similarity($similarity) {
+    // Convert to float
+    $similarity = floatval($similarity);
+    
+    // Ensure similarity is within ElevenLabs API limits (0.0 to 1.0)
+    if ($similarity < 0.0) {
+        $similarity = 0.0;
+    } elseif ($similarity > 1.0) {
+        $similarity = 1.0;
+    }
+    
+    return $similarity;
+}
+
+/**
+ * Sanitize ElevenLabs style exaggeration parameter
+ * 
+ * @param mixed $style The style exaggeration value to sanitize
+ * @return float The sanitized style exaggeration value (0.0-1.0)
+ * @since 1.9.6
+ */
+public function sanitize_elevenlabs_style($style) {
+    // Convert to float
+    $style = floatval($style);
+    
+    // Ensure style is within ElevenLabs API limits (0.0 to 1.0)
+    if ($style < 0.0) {
+        $style = 0.0;
+    } elseif ($style > 1.0) {
+        $style = 1.0;
+    }
+    
+    return $style;
+}
+
+/**
  * FIXED: Ensure valid model setting is always available
  */
 private function ensure_valid_model_setting() {
@@ -6124,20 +6241,23 @@ return false;
 $voice_id = get_option('ai_interview_widget_elevenlabs_voice_id', 'pqHfZKP75CvOlQylNhV4');
 $voice_model = get_option('ai_interview_widget_voice_quality', 'eleven_multilingual_v2');
 $voice_speed = get_option('ai_interview_widget_elevenlabs_voice_speed', 1.0);
+$stability = get_option('ai_interview_widget_elevenlabs_stability', 0.5);
+$similarity = get_option('ai_interview_widget_elevenlabs_similarity', 0.8);
+$style = get_option('ai_interview_widget_elevenlabs_style', 0.0);
 
 $body = array(
 'text' => $text,
 'model_id' => $voice_model,
 'voice_settings' => array(
-'stability' => 0.5,
-'similarity_boost' => 0.8,
-'style' => 0.0,
+'stability' => floatval($stability),
+'similarity_boost' => floatval($similarity),
+'style' => floatval($style),
 'use_speaker_boost' => true,
 'speed' => floatval($voice_speed)
 )
 );
 
-error_log('AI Interview Widget: Generating TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model . ', speed: ' . $voice_speed);
+error_log('AI Interview Widget: Generating TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model . ', speed: ' . $voice_speed . ', stability: ' . $stability . ', similarity: ' . $similarity . ', style: ' . $style);
 
 $response = wp_remote_post("https://api.elevenlabs.io/v1/text-to-speech/{$voice_id}?output_format=mp3_44100_128", array(
 'headers' => array(
@@ -7674,6 +7794,18 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <td><?php $this->elevenlabs_voice_speed_field_callback(); ?></td>
                 </tr>
                 <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">Stability</th>
+                    <td><?php $this->elevenlabs_stability_field_callback(); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">Similarity Boost</th>
+                    <td><?php $this->elevenlabs_similarity_field_callback(); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">Style Exaggeration</th>
+                    <td><?php $this->elevenlabs_style_field_callback(); ?></td>
+                </tr>
+                <tr>
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Enable Voice Features</th>
                     <td><?php $this->enable_voice_field_callback(); ?></td>
                 </tr>
@@ -8296,6 +8428,48 @@ $voice_speed = get_option('ai_interview_widget_elevenlabs_voice_speed', 1.0);
        step="0.05"
        placeholder="1.0">
 <p class="description">Voice playback speed (0.7x - 1.2x). Default is 1.0 for normal speed. Lower values are slower, higher values are faster.</p>
+<?php
+}
+
+public function elevenlabs_stability_field_callback() {
+$stability = get_option('ai_interview_widget_elevenlabs_stability', 0.5);
+?>
+<input type="number" id="elevenlabs_stability" name="ai_interview_widget_elevenlabs_stability"
+       value="<?php echo esc_attr($stability); ?>"
+       class="small-text"
+       min="0.0"
+       max="1.0"
+       step="0.05"
+       placeholder="0.5">
+<p class="description">Stability of the voice (0.0 - 1.0). Higher values make the voice more consistent and predictable, lower values make it more variable and expressive. Default is 0.5.</p>
+<?php
+}
+
+public function elevenlabs_similarity_field_callback() {
+$similarity = get_option('ai_interview_widget_elevenlabs_similarity', 0.8);
+?>
+<input type="number" id="elevenlabs_similarity" name="ai_interview_widget_elevenlabs_similarity"
+       value="<?php echo esc_attr($similarity); ?>"
+       class="small-text"
+       min="0.0"
+       max="1.0"
+       step="0.05"
+       placeholder="0.8">
+<p class="description">Similarity boost (0.0 - 1.0). Controls how closely the AI should stick to the original voice. Higher values make the voice more similar to the original, lower values allow for more variation. Default is 0.8.</p>
+<?php
+}
+
+public function elevenlabs_style_field_callback() {
+$style = get_option('ai_interview_widget_elevenlabs_style', 0.0);
+?>
+<input type="number" id="elevenlabs_style" name="ai_interview_widget_elevenlabs_style"
+       value="<?php echo esc_attr($style); ?>"
+       class="small-text"
+       min="0.0"
+       max="1.0"
+       step="0.05"
+       placeholder="0.0">
+<p class="description">Style exaggeration (0.0 - 1.0). Controls how much the voice should exaggerate its style. Higher values make the voice more expressive and dramatic. Default is 0.0 for neutral delivery.</p>
 <?php
 }
 
@@ -10761,6 +10935,9 @@ public function documentation_page() {
         $voice_id = isset($_POST['elevenlabs_voice_id']) ? sanitize_text_field($_POST['elevenlabs_voice_id']) : '';
         $voice_quality = isset($_POST['voice_quality']) ? sanitize_text_field($_POST['voice_quality']) : '';
         $voice_speed = isset($_POST['elevenlabs_voice_speed']) ? $this->sanitize_elevenlabs_voice_speed($_POST['elevenlabs_voice_speed']) : 1.0;
+        $stability = isset($_POST['elevenlabs_stability']) ? $this->sanitize_elevenlabs_stability($_POST['elevenlabs_stability']) : 0.5;
+        $similarity = isset($_POST['elevenlabs_similarity']) ? $this->sanitize_elevenlabs_similarity($_POST['elevenlabs_similarity']) : 0.8;
+        $style = isset($_POST['elevenlabs_style']) ? $this->sanitize_elevenlabs_style($_POST['elevenlabs_style']) : 0.0;
         $enable_voice = isset($_POST['enable_voice']) ? rest_sanitize_boolean($_POST['enable_voice']) : true;
         $disable_greeting = isset($_POST['disable_greeting_audio']) ? rest_sanitize_boolean($_POST['disable_greeting_audio']) : false;
         $disable_viz = isset($_POST['disable_audio_visualization']) ? rest_sanitize_boolean($_POST['disable_audio_visualization']) : false;
@@ -10771,6 +10948,9 @@ public function documentation_page() {
         update_option('ai_interview_widget_elevenlabs_voice_id', $voice_id);
         update_option('ai_interview_widget_voice_quality', $voice_quality);
         update_option('ai_interview_widget_elevenlabs_voice_speed', $voice_speed);
+        update_option('ai_interview_widget_elevenlabs_stability', $stability);
+        update_option('ai_interview_widget_elevenlabs_similarity', $similarity);
+        update_option('ai_interview_widget_elevenlabs_style', $style);
         update_option('ai_interview_widget_enable_voice', $enable_voice);
         update_option('ai_interview_widget_disable_greeting_audio', $disable_greeting);
         update_option('ai_interview_widget_disable_audio_visualization', $disable_viz);
