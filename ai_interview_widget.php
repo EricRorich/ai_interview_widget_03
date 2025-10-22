@@ -6271,11 +6271,18 @@ error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
 * FIXED: Complete ElevenLabs speech generation
 */
 private function generate_elevenlabs_speech($text) {
-$api_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
-if (empty($api_key)) {
-error_log('AI Interview Widget: No ElevenLabs API key available');
-return false;
-}
+    // Respect the per‑provider enable/disable setting. If ElevenLabs voice is disabled, skip TTS here.
+    $eleven_enabled = get_option('ai_interview_widget_enable_elevenlabs_voice', true);
+    if (!$eleven_enabled) {
+        error_log('AI Interview Widget: ElevenLabs voice is disabled via settings');
+        return false;
+    }
+
+    $api_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
+    if (empty($api_key)) {
+        error_log('AI Interview Widget: No ElevenLabs API key available');
+        return false;
+    }
 
 
 $voice_id = get_option('ai_interview_widget_elevenlabs_voice_id', 'pqHfZKP75CvOlQylNhV4');
