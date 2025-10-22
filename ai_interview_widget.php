@@ -8391,7 +8391,10 @@ public function api_provider_field_callback() {
         const basicModels = {
             'openai': [
                 { value: 'gpt-4o', label: 'GPT-4o (Latest)' },
-                { value: 'gpt-4o-mini', label: 'GPT-4o-mini (Fast)' }
+                { value: 'gpt-4o-mini', label: 'GPT-4o-mini (Fast)' },
+                // Added realtime variants of GPT‑4o for voice/chat capabilities
+                { value: 'gpt-4o-realtime', label: 'GPT-4o Realtime (Voice)' },
+                { value: 'gpt-4o-mini-realtime', label: 'GPT-4o-mini Realtime (Voice)' }
             ],
             'anthropic': [
                 { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Latest)' }
@@ -8400,7 +8403,11 @@ public function api_provider_field_callback() {
                 { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' }
             ],
             'azure': [
-                { value: 'gpt-4o', label: 'GPT-4o (Azure)' }
+                { value: 'gpt-4o', label: 'GPT-4o (Azure)' },
+                { value: 'gpt-4o-mini', label: 'GPT-4o-mini (Azure)' },
+                // Added realtime variants for Azure voice/chat support
+                { value: 'gpt-4o-realtime', label: 'GPT-4o Realtime (Azure Voice)' },
+                { value: 'gpt-4o-mini-realtime', label: 'GPT-4o-mini Realtime (Azure Voice)' }
             ],
             'custom': [
                 { value: 'custom-model', label: 'Custom Model' }
@@ -11218,4 +11225,61 @@ if (file_exists($file) && (time() - filemtime($file)) > 3600) { // Delete files 
 }
 }
 });
+
+// -----------------------------------------------------------------------------
+// Extend AIW model definitions with realtime options for OpenAI and Azure
+//
+// This filter hooks into the aiw_models_for_provider filter provided by the
+// AIW_Provider_Definitions class. It appends realtime model variants for
+// OpenAI and Azure providers so that users can select the realtime voice
+// conversation models directly from the LLM model dropdown in the settings.
+//
+if (!function_exists('aiw_add_realtime_models')) {
+    /**
+     * Adds realtime model entries for OpenAI and Azure providers.
+     *
+     * @param array  $models   Existing models for the provider.
+     * @param string $provider Provider identifier.
+     *
+     * @return array Modified models array with realtime entries.
+     */
+    function aiw_add_realtime_models($models, $provider) {
+        // Define realtime models to append
+        $realtime_models = array(
+            'gpt-4o-realtime' => array(
+                'name' => 'GPT-4o Realtime',
+                'description' => 'Realtime model with voice conversation capabilities – supports streaming audio in/out',
+                'context_window' => 128000,
+                'max_output' => 16384,
+                'capabilities' => array('text', 'vision', 'audio', 'function_calling', 'json_mode'),
+                'recommended' => false,
+                'deprecated' => false,
+                'cost_tier' => 'premium'
+            ),
+            'gpt-4o-mini-realtime' => array(
+                'name' => 'GPT-4o Mini Realtime',
+                'description' => 'Fast and affordable realtime model with voice conversation capabilities',
+                'context_window' => 128000,
+                'max_output' => 16384,
+                'capabilities' => array('text', 'vision', 'audio', 'function_calling', 'json_mode'),
+                'recommended' => false,
+                'deprecated' => false,
+                'cost_tier' => 'medium'
+            )
+        );
+
+        // Append to OpenAI and Azure providers
+        if ($provider === 'openai' || $provider === 'azure') {
+            foreach ($realtime_models as $key => $config) {
+                // Only add if not already present
+                if (!isset($models[$key])) {
+                    $models[$key] = $config;
+                }
+            }
+        }
+
+        return $models;
+    }
+    add_filter('aiw_models_for_provider', 'aiw_add_realtime_models', 10, 2);
+}
 ?>
