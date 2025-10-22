@@ -784,6 +784,17 @@ class AIInterviewWidget {
                 'default' => true
             )
         );
+            
+            // New setting: allow users to turn off ElevenLabs voice specifically while keeping other voice providers
+            register_setting(
+                $settings_group,
+                'ai_interview_widget_enable_elevenlabs_voice',
+                array(
+                    'type' => 'boolean',
+                    'sanitize_callback' => 'rest_sanitize_boolean',
+                    'default' => true
+                )
+            );
 
         register_setting(
             $settings_group,
@@ -1230,6 +1241,15 @@ class AIInterviewWidget {
             'ai-interview-widget',
             'ai_interview_widget_elevenlabs_section'
         );
+
+            // Off switch specifically for ElevenLabs voice synthesis.  When unchecked, the widget will not use ElevenLabs for text‑to‑speech even if other voice features are enabled.
+            add_settings_field(
+                'enable_elevenlabs_voice',
+                'Enable ElevenLabs Voice',
+                array($this, 'enable_elevenlabs_voice_field_callback'),
+                'ai-interview-widget',
+                'ai_interview_widget_elevenlabs_section'
+            );
         
         add_settings_field(
             'disable_greeting_audio',
@@ -6206,26 +6226,45 @@ $text = substr($text, 0, 5000) . '...';
 error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
 }
 
-error_log('AI Interview Widget: Generating TTS for text: ' . substr($text, 0, 50) . '...');
+        error_log('AI Interview Widget: Generating TTS for text: ' . substr($text, 0, 50) . '...');
 
-// Try ElevenLabs TTS first
-$audio_url = $this->generate_elevenlabs_speech($text);
+        // Determine which TTS provider to use based on user settings
+        $use_elevenlabs = get_option('ai_interview_widget_enable_elevenlabs_voice', true);
+        $audio_url = false;
+        $source = '';
 
-if ($audio_url) {
-wp_send_json_success(array(
-'audio_url' => $audio_url,
-'source' => 'elevenlabs',
-'text' => $text
-));
-} else {
-// If ElevenLabs fails, inform frontend to use fallback
-wp_send_json_success(array(
-'fallback' => true,
-'source' => 'browser',
-'text' => $text,
-'message' => 'Using browser TTS fallback'
-));
-}
+        if ($use_elevenlabs) {
+            // Attempt ElevenLabs TTS first
+            $audio_url = $this->generate_elevenlabs_speech($text);
+            if ($audio_url) {
+                $source = 'elevenlabs';
+            }
+        }
+
+        // If ElevenLabs is disabled or fails, try OpenAI TTS as a secondary provider
+        if (!$audio_url) {
+            $openai_url = $this->generate_openai_speech($text);
+            if ($openai_url) {
+                $audio_url = $openai_url;
+                $source = 'openai';
+            }
+        }
+
+        if ($audio_url) {
+            wp_send_json_success(array(
+                'audio_url' => $audio_url,
+                'source' => $source,
+                'text' => $text
+            ));
+        } else {
+            // If no TTS provider succeeded, inform frontend to use fallback
+            wp_send_json_success(array(
+                'fallback' => true,
+                'source' => 'browser',
+                'text' => $text,
+                'message' => 'Using browser TTS fallback'
+            ));
+        }
 }
 
 /**
@@ -6237,6 +6276,7 @@ if (empty($api_key)) {
 error_log('AI Interview Widget: No ElevenLabs API key available');
 return false;
 }
+
 
 $voice_id = get_option('ai_interview_widget_elevenlabs_voice_id', 'pqHfZKP75CvOlQylNhV4');
 $voice_model = get_option('ai_interview_widget_voice_quality', 'eleven_multilingual_v2');
@@ -6310,6 +6350,88 @@ return false;
 }
 }
 
+    /**
+     * Generate speech using OpenAI's Text-to-Speech API.
+     *
+     * This method uses the existing OpenAI API key stored in the plugin settings to
+     * request an MP3 audio file from OpenAI's TTS endpoint. It falls back to false
+     * if the API key is missing, invalid, or if any HTTP error occurs.
+     *
+     * @since 1.9.6
+     * @param string $text The plain text to convert to speech (max 5000 characters).
+     * @return string|false The URL to the saved audio file or false on failure.
+     */
+    private function generate_openai_speech($text) {
+        $api_key = get_option('ai_interview_widget_openai_api_key', '');
+        if (empty($api_key)) {
+            error_log('AI Interview Widget: No OpenAI API key available for TTS');
+            return false;
+        }
+
+        // Limit the input length to 5000 characters for OpenAI TTS as well
+        if (strlen($text) > 5000) {
+            $text = substr($text, 0, 5000) . '...';
+        }
+
+        // Define the model and voice for OpenAI TTS. These can be extended to settings if needed.
+        $model = 'tts-1';
+        $voice = 'alloy';
+
+        $body = array(
+            'model' => $model,
+            'input' => $text,
+            'voice' => $voice,
+            'response_format' => 'mp3'
+        );
+
+        // Prepare the request to OpenAI's speech API
+        $response = wp_remote_post('https://api.openai.com/v1/audio/speech', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json'
+            ),
+            'body' => json_encode($body),
+            'timeout' => 30
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('AI Interview Widget: OpenAI TTS error: ' . $response->get_error_message());
+            return false;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code !== 200) {
+            error_log('AI Interview Widget: OpenAI TTS HTTP error: ' . $code);
+            $error_body = wp_remote_retrieve_body($response);
+            error_log('AI Interview Widget: OpenAI error response: ' . substr($error_body, 0, 500));
+            return false;
+        }
+
+        $audio_data = wp_remote_retrieve_body($response);
+
+        // Save audio file to the same directory as ElevenLabs TTS files
+        $upload_dir = wp_upload_dir();
+        $tts_dir = $upload_dir['basedir'] . '/ai-interview-tts';
+        if (!file_exists($tts_dir)) {
+            wp_mkdir_p($tts_dir);
+        }
+        $filename = 'ai_voice_tts_openai_' . time() . '_' . wp_generate_password(8, false) . '.mp3';
+        $file_path = $tts_dir . '/' . $filename;
+
+        if (file_put_contents($file_path, $audio_data)) {
+            $audio_url = $upload_dir['baseurl'] . '/ai-interview-tts/' . $filename;
+            error_log('AI Interview Widget: OpenAI TTS file saved successfully: ' . $audio_url);
+
+            // Schedule cleanup of old TTS files
+            wp_schedule_single_event(time() + 3600, 'ai_interview_cleanup_tts_files');
+
+            return $audio_url;
+        } else {
+            error_log('AI Interview Widget: Failed to save OpenAI TTS audio file');
+            return false;
+        }
+    }
+
 /**
 * FIXED: Handle voice TTS requests
 */
@@ -6334,15 +6456,27 @@ return;
 
 error_log('AI Interview Widget: Voice TTS request for text: ' . substr($text, 0, 100) . '...');
 
-$audio_url = $this->generate_elevenlabs_speech($text);
+        // Determine which TTS provider to use based on user settings
+        $use_elevenlabs = get_option('ai_interview_widget_enable_elevenlabs_voice', true);
+        $audio_url = false;
 
-if ($audio_url) {
-error_log('AI Interview Widget: TTS generation successful');
-wp_send_json_success(array('audio_url' => $audio_url));
-} else {
-error_log('AI Interview Widget: TTS generation failed, will fallback to browser TTS');
-wp_send_json_error('TTS generation failed - will use browser fallback');
-}
+        if ($use_elevenlabs) {
+            // Attempt ElevenLabs TTS first
+            $audio_url = $this->generate_elevenlabs_speech($text);
+        }
+
+        // If ElevenLabs is disabled or fails, try OpenAI TTS
+        if (!$audio_url) {
+            $audio_url = $this->generate_openai_speech($text);
+        }
+
+        if ($audio_url) {
+            error_log('AI Interview Widget: TTS generation successful');
+            wp_send_json_success(array('audio_url' => $audio_url));
+        } else {
+            error_log('AI Interview Widget: TTS generation failed, will fallback to browser TTS');
+            wp_send_json_error('TTS generation failed - will use browser fallback');
+        }
 } catch (Exception $e) {
 error_log('AI Interview Widget: Voice TTS exception: ' . $e->getMessage());
 wp_send_json_error('Voice TTS error: ' . $e->getMessage());
@@ -8483,6 +8617,26 @@ $voice_enabled = get_option('ai_interview_widget_enable_voice', true);
 <p class="description">Enables microphone input and voice responses. Uses ElevenLabs if configured, otherwise browser TTS.</p>
 <?php
 }
+
+    /**
+     * Callback: Enable ElevenLabs Voice
+     *
+     * Displays a checkbox to turn on/off ElevenLabs voice synthesis. When disabled, the widget falls back to other
+     * available TTS providers (e.g., the browser's speech synthesis or future OpenAI TTS integration).
+     *
+     * @since 1.9.6
+     */
+    public function enable_elevenlabs_voice_field_callback() {
+        // Retrieve current setting value; default to true if not set
+        $enabled = get_option('ai_interview_widget_enable_elevenlabs_voice', true);
+        ?>
+        <label>
+            <input type="checkbox" id="enable_elevenlabs_voice" name="ai_interview_widget_enable_elevenlabs_voice" value="1" <?php checked($enabled); ?>>
+            Enable ElevenLabs voice synthesis
+        </label>
+        <p class="description">Disable this option to turn off ElevenLabs text‑to‑speech. Other voice providers (such as browser TTS or OpenAI) will still be used if available.</p>
+        <?php
+    }
 
 public function disable_greeting_audio_field_callback() {
 $disabled = get_option('ai_interview_widget_disable_greeting_audio', false);
