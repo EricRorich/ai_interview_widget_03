@@ -7943,6 +7943,11 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Enable Voice Features</th>
                     <td><?php $this->enable_voice_field_callback(); ?></td>
                 </tr>
+                <!-- Per‑provider switch: allow disabling ElevenLabs while keeping other voices -->
+                <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">Enable ElevenLabs Voice</th>
+                    <td><?php $this->enable_elevenlabs_voice_field_callback(); ?></td>
+                </tr>
                 <tr>
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Disable Greeting Audio</th>
                     <td><?php $this->disable_greeting_audio_field_callback(); ?></td>
