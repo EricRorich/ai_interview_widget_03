@@ -1,0 +1,81 @@
+# WordPress Plugin - AI Interview Widget
+# .gitignore file
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if using npm)
+node_modules/
+package-lock.json
+
+# Composer dependencies (if using composer)
+vendor/
+composer.lock
+
+# Build artifacts
+dist/
+build/
+*.min.js
+*.min.css
+
+# WordPress specific
+wp-content/uploads/
+wp-content/cache/
+wp-content/backup-db/
+wp-content/upgrade/
+wp-content/debug.log
+
+# Audio files (if generated/temporary)
+*.mp3.tmp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# PHP
+composer.phar
+.phpunit.result.cache
+
+# Testing
+coverage/
+.phpunit.cache/
