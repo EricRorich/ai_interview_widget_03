@@ -81,9 +81,10 @@ Currently supported versions with security updates:
 
 If you discover a security vulnerability, please report it by:
 
-1. **Email**: Send details to [security contact - to be added]
-2. **Do NOT** create a public GitHub issue
-3. **Do NOT** disclose publicly until patch is released
+1. **Email**: Send details to the repository owner via GitHub
+2. **GitHub Security Advisory**: Use the "Security" tab in the repository to report privately
+3. **Do NOT** create a public GitHub issue
+4. **Do NOT** disclose publicly until patch is released
 
 ### What to Include
 
@@ -178,8 +179,9 @@ Review their security policies and terms of service.
 
 ## Contact
 
-For security concerns: [To be added]
-For general support: Create a GitHub issue
+- **Security concerns**: Use GitHub Security Advisory or contact repository owner
+- **General support**: Create a GitHub issue
+- **Documentation**: See README.md and related files
 
 ---
 

@@ -40,17 +40,19 @@ class AIW_Security_Helper {
             case 'openai':
             case 'azure':
                 // OpenAI keys start with 'sk-' and are typically 48-51 characters
-                if (!preg_match('/^sk-[A-Za-z0-9]{40,}$/', $api_key)) {
+                // Maximum length set to prevent DoS attacks
+                if (!preg_match('/^sk-[A-Za-z0-9]{40,150}$/', $api_key)) {
                     return array(
                         'valid' => false,
-                        'message' => 'Invalid OpenAI API key format. Should start with "sk-" followed by alphanumeric characters.'
+                        'message' => 'Invalid OpenAI API key format. Should start with "sk-" followed by 40-150 alphanumeric characters.'
                     );
                 }
                 break;
                 
             case 'anthropic':
-                // Anthropic keys start with 'sk-ant-' 
-                if (!preg_match('/^sk-ant-[A-Za-z0-9_-]{95,}$/', $api_key)) {
+                // Anthropic keys start with 'sk-ant-' and vary in length
+                // Typical length is around 95-108 characters after prefix
+                if (!preg_match('/^sk-ant-[A-Za-z0-9_-]{80,120}$/', $api_key)) {
                     return array(
                         'valid' => false,
                         'message' => 'Invalid Anthropic API key format. Should start with "sk-ant-".'
