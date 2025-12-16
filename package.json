@@ -1,0 +1,45 @@
+{
+  "name": "ai-interview-widget",
+  "version": "1.9.5",
+  "description": "Interactive AI widget for WordPress with voice capabilities and customization options",
+  "main": "ai-interview-widget.js",
+  "scripts": {
+    "lint:js": "eslint *.js admin/**/*.js --ignore-pattern '*.min.js'",
+    "lint:css": "stylelint '*.css' 'admin/**/*.css' --ignore-pattern '*.min.css'",
+    "format": "prettier --write '*.js' '*.css' 'admin/**/*.js' 'admin/**/*.css'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EricRorich/ai_interview_widget_03.git"
+  },
+  "keywords": [
+    "wordpress",
+    "plugin",
+    "ai",
+    "chat",
+    "interview",
+    "voice",
+    "speech-recognition",
+    "text-to-speech",
+    "openai",
+    "elevenlabs",
+    "customizer"
+  ],
+  "author": "Eric Rorich",
+  "license": "GPL-2.0-or-later",
+  "bugs": {
+    "url": "https://github.com/EricRorich/ai_interview_widget_03/issues"
+  },
+  "homepage": "https://github.com/EricRorich/ai_interview_widget_03#readme",
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-wordpress": "^2.0.0",
+    "prettier": "^3.2.4",
+    "stylelint": "^16.2.0",
+    "stylelint-config-wordpress": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
