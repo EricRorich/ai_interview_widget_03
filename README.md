@@ -4,6 +4,15 @@
 
 This repository contains the finalized architecture implementation of the AI Interview Widget plugin, featuring modern WordPress development standards with Service Provider pattern, Dependency Injection, and comprehensive build pipeline.
 
+## 📚 Documentation Quick Links
+
+- **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to this project  
+- **[Security Policy](SECURITY.md)** - Security best practices and reporting
+- **[Changelog](CHANGELOG.md)** - Version history and updates
+
+> **New to this plugin?** Start with the [Quick Start Guide](QUICKSTART.md) for step-by-step setup instructions.
+
 ## 🏗️ Finalized Architecture Features
 
 ### Core Architecture
