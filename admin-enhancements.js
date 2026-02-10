@@ -42,6 +42,8 @@
         if (providerSelect && providerSelect.value) {
             updateModelOptionsEnhanced(providerSelect.value);
         }
+
+        setupTTSProviderChangeHandler();
     }
 
     /**
@@ -189,6 +191,36 @@
             // Call our enhanced model updater
             updateModelOptionsEnhanced(this.value);
         };
+    }
+
+    /**
+     * Show/hide voice fields based on selected TTS provider.
+     */
+    function toggleTTSProviderFields(provider) {
+        const elevenlabsRows = document.querySelectorAll('.aiw-tts-provider-elevenlabs');
+        const openaiRows = document.querySelectorAll('.aiw-tts-provider-openai');
+
+        elevenlabsRows.forEach(row => {
+            row.style.display = provider === 'elevenlabs' ? '' : 'none';
+        });
+
+        openaiRows.forEach(row => {
+            row.style.display = provider === 'openai' ? '' : 'none';
+        });
+    }
+
+    /**
+     * Setup TTS provider change handler for voice settings.
+     */
+    function setupTTSProviderChangeHandler() {
+        const ttsProviderSelect = document.getElementById('tts_provider');
+        if (!ttsProviderSelect) return;
+
+        toggleTTSProviderFields(ttsProviderSelect.value || 'elevenlabs');
+
+        ttsProviderSelect.addEventListener('change', function() {
+            toggleTTSProviderFields(this.value || 'elevenlabs');
+        });
     }
 
     /**
@@ -491,6 +523,7 @@
                     
                 case 'voice':
                     data.action = 'ai_interview_save_voice_settings';
+                    data.tts_provider = $('select[name="ai_interview_widget_tts_provider"]').val();
                     data.elevenlabs_api_key = $('input[name="ai_interview_widget_elevenlabs_api_key"]').val();
                     data.elevenlabs_voice_id = $('input[name="ai_interview_widget_elevenlabs_voice_id"]').val();
                     data.voice_quality = $('select[name="ai_interview_widget_voice_quality"]').val();
@@ -498,10 +531,20 @@
                     data.elevenlabs_stability = $('input[name="ai_interview_widget_elevenlabs_stability"]').val();
                     data.elevenlabs_similarity = $('input[name="ai_interview_widget_elevenlabs_similarity"]').val();
                     data.elevenlabs_style = $('input[name="ai_interview_widget_elevenlabs_style"]').val();
+                    data.openai_tts_api_key = $('input[name="ai_interview_widget_openai_tts_api_key"]').val();
+                    data.openai_tts_model = $('select[name="ai_interview_widget_openai_tts_model"]').val();
+                    data.openai_tts_voice = $('select[name="ai_interview_widget_openai_tts_voice"]').val();
+                    data.openai_tts_format = $('select[name="ai_interview_widget_openai_tts_format"]').val();
                     data.enable_voice = $('input[name="ai_interview_widget_enable_voice"]').is(':checked') ? 1 : 0;
                     data.disable_greeting_audio = $('input[name="ai_interview_widget_disable_greeting_audio"]').is(':checked') ? 1 : 0;
                     data.disable_audio_visualization = $('input[name="ai_interview_widget_disable_audio_visualization"]').is(':checked') ? 1 : 0;
                     data.chatbox_only_mode = $('input[name="ai_interview_widget_chatbox_only_mode"]').is(':checked') ? 1 : 0;
+
+                    if (data.tts_provider === 'openai' && !String(data.openai_tts_api_key || '').trim()) {
+                        showMessage(messageDiv, 'OpenAI TTS API key is required when OpenAI provider is selected.', 'error');
+                        resetButton(button);
+                        return;
+                    }
                     break;
                     
                 case 'language':
