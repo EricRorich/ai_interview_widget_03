@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Voice feature state
     let voiceEnabled = false;
     let hasElevenLabsKey = false;
+    let ttsProvider = 'elevenlabs';
+    let hasTTSProviderKey = false;
     let speechRecognition = null;
     let speechSynthesis = null;
     let isListening = false;
@@ -234,6 +236,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 audio_files_available: false,
                 voice_enabled: false,
                 has_elevenlabs_key: false,
+                tts_provider: 'elevenlabs',
+                has_tts_provider_key: false,
                 // Content settings (now dynamic instead of FIXED)
                 system_prompt_en: '',
                 system_prompt_de: '',
@@ -262,6 +266,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 widgetData.audio_files_available = window.aiWidgetData.audio_files_available || false;
                 widgetData.voice_enabled = window.aiWidgetData.voice_enabled || false;
                 widgetData.has_elevenlabs_key = window.aiWidgetData.has_elevenlabs_key || false;
+                widgetData.tts_provider = window.aiWidgetData.tts_provider || 'elevenlabs';
+                widgetData.has_tts_provider_key = window.aiWidgetData.has_tts_provider_key || false;
                 // Load content settings from backend
                 widgetData.system_prompt_en = window.aiWidgetData.system_prompt_en || '';
                 widgetData.system_prompt_de = window.aiWidgetData.system_prompt_de || '';
@@ -355,10 +361,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Initialize voice features - FIXED
-        voiceEnabled = widgetData.voice_enabled && (widgetData.has_elevenlabs_key || 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+        ttsProvider = widgetData.tts_provider || 'elevenlabs';
+        hasTTSProviderKey = typeof widgetData.has_tts_provider_key !== 'undefined'
+            ? widgetData.has_tts_provider_key
+            : widgetData.has_elevenlabs_key;
+        voiceEnabled = widgetData.voice_enabled && (hasTTSProviderKey || 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
         hasElevenLabsKey = widgetData.has_elevenlabs_key;
         
-        debug("Voice features:", { voiceEnabled, hasElevenLabsKey });
+        debug("Voice features:", { voiceEnabled, hasElevenLabsKey, ttsProvider, hasTTSProviderKey });
 
         // ELEMENT HOOKUP - UPDATED FOR STRUCTURAL SEPARATION
         const audio = document.getElementById('aiEricGreeting');
@@ -967,13 +977,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // --- TTS FUNCTIONALITY - FIXED COMPLETE VERSION ---
         async function generateTTS(text) {
-            if (!hasElevenLabsKey) {
-                debug("No ElevenLabs key, using fallback TTS");
+            if (!hasTTSProviderKey) {
+                debug(`No configured ${ttsProvider} TTS key, using fallback TTS`);
                 return useFallbackTTS(text);
             }
 
             try {
-                debug("Generating TTS with ElevenLabs:", text.substring(0, 50) + "...");
+                debug(`Generating TTS with provider ${ttsProvider}:`, text.substring(0, 50) + "...");
 
                 const formData = new FormData();
                 formData.append('action', 'ai_interview_tts');
@@ -996,15 +1006,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success && data.data && data.data.audio_url) {
                     return data.data.audio_url;
                 } else if (data.success && data.data && data.data.fallback) {
-                    // ElevenLabs API failed, use browser fallback
-                    debug("ElevenLabs TTS not available, using fallback:", data.data.message || 'No message');
-                    throw new Error("ElevenLabs TTS failed, using fallback");
+                    // Server-side TTS failed, use browser fallback
+                    debug("Server TTS not available, using fallback:", data.data.message || 'No message');
+                    throw new Error("Server TTS failed, using fallback");
                 } else {
                     debug("Invalid TTS response format:", data);
                     throw new Error("Invalid TTS response");
                 }
             } catch (error) {
-                debug("ElevenLabs TTS failed:", error);
+                debug("Server TTS failed:", error);
                 return useFallbackTTS(text);
             }
         }
@@ -1069,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                // Play ElevenLabs audio
+                // Play server-generated TTS audio
                 currentTTSAudio = new Audio(audioUrl);
                 currentTTSAudio.onended = function() {
                     currentTTSAudio = null;
@@ -1101,11 +1111,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function stopCurrentTTS() {
-            // Stop ElevenLabs audio
+            // Stop server-generated TTS audio
             if (currentTTSAudio) {
                 currentTTSAudio.pause();
                 currentTTSAudio = null;
-                debug("Stopped ElevenLabs TTS");
+                debug("Stopped server TTS audio");
             }
 
             // Stop fallback TTS
@@ -3391,7 +3401,7 @@ if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' |
   console.log('🎉 AI Interview Widget v1.9.4 Enhanced Language Detection fully loaded at', new Date().toISOString());
   console.log('🌍 Enhanced multi-language detection with comprehensive IP-based country mapping');
   console.log('🗣️ Support for 20 languages with automatic fallback to English');
-  console.log('🎤 Voice Features: TTS/STT with ElevenLabs and browser fallback');
+  console.log('🎤 Voice Features: TTS/STT with configurable server provider and browser fallback');
   console.log('📱 Responsive design for mobile, tablet, and desktop');
   console.log('✅ Enhanced language detection system active with robust fallback logic!');
 }

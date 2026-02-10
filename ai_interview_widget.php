@@ -143,6 +143,11 @@ class AIInterviewWidget {
             'ai_interview_widget_openai_api_key',
             'ai_interview_widget_elevenlabs_api_key',
             'ai_interview_widget_elevenlabs_voice_id',
+            'ai_interview_widget_tts_provider',
+            'ai_interview_widget_openai_tts_api_key',
+            'ai_interview_widget_openai_tts_model',
+            'ai_interview_widget_openai_tts_voice',
+            'ai_interview_widget_openai_tts_format',
             'ai_interview_widget_enable_voice',
             'ai_interview_widget_voice_quality',
             'ai_interview_widget_style_settings',
@@ -538,7 +543,7 @@ class AIInterviewWidget {
         }
         
         // Handle TTS audio files from uploads directory
-        if (preg_match('/^ai_voice_tts_[\d]+_[a-zA-Z0-9]+\.mp3$/', $audio_file)) {
+        if (preg_match('/^ai_voice_tts_[\d]+_[a-zA-Z0-9]+\.(mp3|wav)$/', $audio_file)) {
             $upload_dir = wp_upload_dir();
             $file_path = $upload_dir['basedir'] . '/ai-interview-tts/' . $audio_file;
             if (file_exists($file_path)) {
@@ -564,7 +569,9 @@ class AIInterviewWidget {
         }
         
         // Set headers for audio streaming
-        header('Content-Type: audio/mpeg');
+        $extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+        $content_type = ($extension === 'wav') ? 'audio/wav' : 'audio/mpeg';
+        header('Content-Type: ' . $content_type);
         header('Content-Length: ' . filesize($file_path));
         header('Accept-Ranges: bytes');
         header('Cache-Control: public, max-age=3600');
@@ -832,6 +839,56 @@ class AIInterviewWidget {
                 'type' => 'number',
                 'sanitize_callback' => array($this, 'sanitize_elevenlabs_style'),
                 'default' => 0.0
+            )
+        );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_tts_provider',
+            array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_tts_provider'),
+                'default' => 'elevenlabs'
+            )
+        );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_openai_tts_api_key',
+            array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_openai_tts_api_key'),
+                'default' => ''
+            )
+        );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_openai_tts_model',
+            array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_openai_tts_model'),
+                'default' => 'gpt-4o-mini-tts'
+            )
+        );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_openai_tts_voice',
+            array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_openai_tts_voice'),
+                'default' => 'alloy'
+            )
+        );
+
+        register_setting(
+            $settings_group,
+            'ai_interview_widget_openai_tts_format',
+            array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_openai_tts_format'),
+                'default' => 'mp3'
             )
         );
         
@@ -6051,6 +6108,23 @@ return get_option('ai_interview_widget_openai_api_key', '');
 return $api_key;
 }
 
+// Sanitize OpenAI TTS API key
+public function sanitize_openai_tts_api_key($api_key) {
+$api_key = trim($api_key);
+
+if (!empty($api_key) && (!$this->starts_with($api_key, 'sk-') || strlen($api_key) < 40)) {
+add_settings_error(
+'ai_interview_widget_openai_tts_api_key',
+'invalid_openai_tts_api_key',
+'Invalid OpenAI TTS API key format. API keys should start with "sk-" and be at least 40 characters long.',
+'error'
+);
+return get_option('ai_interview_widget_openai_tts_api_key', '');
+}
+
+return $api_key;
+}
+
 // Sanitize ElevenLabs API key
 public function sanitize_elevenlabs_api_key($api_key) {
 $api_key = trim($api_key);
@@ -6147,6 +6221,59 @@ public function sanitize_elevenlabs_style($style) {
 }
 
 /**
+ * Sanitize TTS provider setting.
+ *
+ * @param mixed $provider TTS provider value.
+ * @return string
+ */
+public function sanitize_tts_provider($provider) {
+    $provider = sanitize_text_field($provider);
+    $allowed_providers = array('elevenlabs', 'openai');
+    return in_array($provider, $allowed_providers, true) ? $provider : 'elevenlabs';
+}
+
+/**
+ * Sanitize OpenAI TTS model setting.
+ *
+ * @param mixed $model Model value.
+ * @return string
+ */
+public function sanitize_openai_tts_model($model) {
+    $model = sanitize_text_field($model);
+    return !empty($model) ? $model : 'gpt-4o-mini-tts';
+}
+
+/**
+ * Sanitize OpenAI TTS voice setting.
+ *
+ * @param mixed $voice Voice value.
+ * @return string
+ */
+public function sanitize_openai_tts_voice($voice) {
+    $voice = strtolower(sanitize_text_field($voice));
+    $voice = preg_replace('/[^a-z0-9_-]/', '', $voice);
+
+    if (empty($voice)) {
+        return 'alloy';
+    }
+
+    $allowed_voices = array_keys($this->get_openai_tts_voice_options());
+    return in_array($voice, $allowed_voices, true) ? $voice : 'alloy';
+}
+
+/**
+ * Sanitize OpenAI TTS output format.
+ *
+ * @param mixed $format Output format.
+ * @return string
+ */
+public function sanitize_openai_tts_format($format) {
+    $format = strtolower(sanitize_text_field($format));
+    $allowed_formats = array('mp3', 'wav');
+    return in_array($format, $allowed_formats, true) ? $format : 'mp3';
+}
+
+/**
  * FIXED: Ensure valid model setting is always available
  */
 private function ensure_valid_model_setting() {
@@ -6180,7 +6307,7 @@ private function ensure_valid_model_setting() {
 // ==========================================
 
 /**
-* FIXED: Handle TTS requests with complete ElevenLabs integration
+* FIXED: Handle TTS requests with provider-aware routing.
 */
 public function handle_tts_request() {
 error_log('AI Interview Widget: TTS request received at ' . current_time('Y-m-d H:i:s'));
@@ -6199,8 +6326,7 @@ wp_send_json_error('No text provided for TTS');
 return;
 }
 
-// Limit text length for TTS to ElevenLabs API limits (5000 characters)
-// This should accommodate the full response based on the token limit setting
+// Limit text length for TTS requests
 if (strlen($text) > 5000) {
 $text = substr($text, 0, 5000) . '...';
 error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
@@ -6208,17 +6334,15 @@ error_log('AI Interview Widget: TTS text was truncated to 5000 characters');
 
 error_log('AI Interview Widget: Generating TTS for text: ' . substr($text, 0, 50) . '...');
 
-// Try ElevenLabs TTS first
-$audio_url = $this->generate_elevenlabs_speech($text);
+$tts_result = $this->generate_tts_speech($text);
 
-if ($audio_url) {
+if (!empty($tts_result['audio_url'])) {
 wp_send_json_success(array(
-'audio_url' => $audio_url,
-'source' => 'elevenlabs',
+'audio_url' => $tts_result['audio_url'],
+'source' => $tts_result['source'],
 'text' => $text
 ));
 } else {
-// If ElevenLabs fails, inform frontend to use fallback
 wp_send_json_success(array(
 'fallback' => true,
 'source' => 'browser',
@@ -6229,8 +6353,85 @@ wp_send_json_success(array(
 }
 
 /**
-* FIXED: Complete ElevenLabs speech generation
-*/
+ * Get active TTS provider.
+ *
+ * @return string
+ */
+private function get_active_tts_provider() {
+return $this->sanitize_tts_provider(get_option('ai_interview_widget_tts_provider', 'elevenlabs'));
+}
+
+/**
+ * Check whether the selected TTS provider has a configured API key.
+ *
+ * @return bool
+ */
+private function has_configured_tts_provider_key() {
+$provider = $this->get_active_tts_provider();
+
+if ($provider === 'openai') {
+    $key = get_option('ai_interview_widget_openai_tts_api_key', '');
+    return !empty(trim($key));
+}
+
+$key = get_option('ai_interview_widget_elevenlabs_api_key', '');
+return !empty(trim($key));
+}
+
+/**
+ * Provider router for TTS generation.
+ *
+ * @param string $text Text to synthesize.
+ * @return array
+ */
+private function generate_tts_speech($text) {
+$provider = $this->get_active_tts_provider();
+$audio_url = ($provider === 'openai')
+    ? $this->generate_openai_speech($text)
+    : $this->generate_elevenlabs_speech($text);
+
+if ($audio_url) {
+    return array('audio_url' => $audio_url, 'source' => $provider);
+}
+
+return array('audio_url' => false, 'source' => 'browser');
+}
+
+/**
+ * Save provider audio bytes to a temporary upload file.
+ *
+ * @param string $audio_data Binary audio data.
+ * @param string $extension File extension (mp3/wav).
+ * @return string|false
+ */
+private function save_tts_audio_data($audio_data, $extension = 'mp3') {
+if (empty($audio_data)) {
+    return false;
+}
+
+$extension = $this->sanitize_openai_tts_format($extension);
+$upload_dir = wp_upload_dir();
+$tts_dir = $upload_dir['basedir'] . '/ai-interview-tts';
+
+if (!file_exists($tts_dir)) {
+    wp_mkdir_p($tts_dir);
+}
+
+$filename = 'ai_voice_tts_' . time() . '_' . wp_generate_password(8, false) . '.' . $extension;
+$file_path = $tts_dir . '/' . $filename;
+
+if (file_put_contents($file_path, $audio_data) === false) {
+    error_log('AI Interview Widget: Failed to save TTS audio file');
+    return false;
+}
+
+wp_schedule_single_event(time() + 3600, 'ai_interview_cleanup_tts_files');
+return $upload_dir['baseurl'] . '/ai-interview-tts/' . $filename;
+}
+
+/**
+ * FIXED: Complete ElevenLabs speech generation.
+ */
 private function generate_elevenlabs_speech($text) {
 $api_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
 if (empty($api_key)) {
@@ -6257,7 +6458,7 @@ $body = array(
 )
 );
 
-error_log('AI Interview Widget: Generating TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model . ', speed: ' . $voice_speed . ', stability: ' . $stability . ', similarity: ' . $similarity . ', style: ' . $style);
+error_log('AI Interview Widget: Generating ElevenLabs TTS with voice ID: ' . $voice_id . ', model: ' . $voice_model);
 
 $response = wp_remote_post("https://api.elevenlabs.io/v1/text-to-speech/{$voice_id}?output_format=mp3_44100_128", array(
 'headers' => array(
@@ -6265,7 +6466,7 @@ $response = wp_remote_post("https://api.elevenlabs.io/v1/text-to-speech/{$voice_
 'Content-Type' => 'application/json',
 'Accept' => 'audio/mpeg'
 ),
-'body' => json_encode($body),
+'body' => wp_json_encode($body),
 'timeout' => 30
 ));
 
@@ -6283,31 +6484,94 @@ return false;
 }
 
 $audio_data = wp_remote_retrieve_body($response);
+$audio_url = $this->save_tts_audio_data($audio_data, 'mp3');
 
-// Save audio file temporarily
-$upload_dir = wp_upload_dir();
-$tts_dir = $upload_dir['basedir'] . '/ai-interview-tts';
-
-// Ensure TTS directory exists
-if (!file_exists($tts_dir)) {
-wp_mkdir_p($tts_dir);
+if ($audio_url) {
+error_log('AI Interview Widget: ElevenLabs TTS file saved successfully');
 }
-
-$filename = 'ai_voice_tts_' . time() . '_' . wp_generate_password(8, false) . '.mp3';
-$file_path = $tts_dir . '/' . $filename;
-
-if (file_put_contents($file_path, $audio_data)) {
-$audio_url = $upload_dir['baseurl'] . '/ai-interview-tts/' . $filename;
-error_log('AI Interview Widget: TTS file saved successfully: ' . $audio_url);
-
-// Schedule cleanup of old TTS files
-wp_schedule_single_event(time() + 3600, 'ai_interview_cleanup_tts_files');
 
 return $audio_url;
-} else {
-error_log('AI Interview Widget: Failed to save TTS audio file');
-return false;
 }
+
+/**
+ * Generate speech with OpenAI TTS.
+ *
+ * @param string $text Text to synthesize.
+ * @return string|false
+ */
+private function generate_openai_speech($text) {
+$api_key = trim(get_option('ai_interview_widget_openai_tts_api_key', ''));
+if (empty($api_key)) {
+    error_log('AI Interview Widget: No OpenAI TTS API key available');
+    return false;
+}
+
+$model = $this->sanitize_openai_tts_model(get_option('ai_interview_widget_openai_tts_model', 'gpt-4o-mini-tts'));
+$voice = $this->sanitize_openai_tts_voice(get_option('ai_interview_widget_openai_tts_voice', 'alloy'));
+$format = $this->sanitize_openai_tts_format(get_option('ai_interview_widget_openai_tts_format', 'mp3'));
+$accept_header = ($format === 'wav') ? 'audio/wav' : 'audio/mpeg';
+
+$body = array(
+    'model' => $model,
+    'voice' => $voice,
+    'input' => $text,
+    'response_format' => $format
+);
+
+$request_args = array(
+    'headers' => array(
+        'Authorization' => 'Bearer ' . $api_key,
+        'Content-Type' => 'application/json',
+        'Accept' => $accept_header
+    ),
+    'body' => wp_json_encode($body),
+    'timeout' => 45
+);
+
+$response = wp_remote_post('https://api.openai.com/v1/audio/speech', $request_args);
+
+if (is_wp_error($response)) {
+    error_log('AI Interview Widget: OpenAI TTS error: ' . $response->get_error_message());
+    return false;
+}
+
+$code = wp_remote_retrieve_response_code($response);
+if ($code !== 200 && $code === 400) {
+    // Compatibility fallback for APIs that expect "format" instead of "response_format".
+    $fallback_body = $body;
+    unset($fallback_body['response_format']);
+    $fallback_body['format'] = $format;
+    $request_args['body'] = wp_json_encode($fallback_body);
+    $response = wp_remote_post('https://api.openai.com/v1/audio/speech', $request_args);
+    if (!is_wp_error($response)) {
+        $code = wp_remote_retrieve_response_code($response);
+    }
+}
+
+if (is_wp_error($response)) {
+    error_log('AI Interview Widget: OpenAI TTS fallback error: ' . $response->get_error_message());
+    return false;
+}
+
+if ($code !== 200) {
+    error_log('AI Interview Widget: OpenAI TTS HTTP error: ' . $code);
+    $error_body = wp_remote_retrieve_body($response);
+    error_log('AI Interview Widget: OpenAI TTS error response: ' . substr($error_body, 0, 500));
+    return false;
+}
+
+$audio_data = wp_remote_retrieve_body($response);
+if (empty($audio_data)) {
+    error_log('AI Interview Widget: OpenAI TTS returned empty audio data');
+    return false;
+}
+
+$audio_url = $this->save_tts_audio_data($audio_data, $format);
+if ($audio_url) {
+    error_log('AI Interview Widget: OpenAI TTS file saved successfully');
+}
+
+return $audio_url;
 }
 
 /**
@@ -6334,11 +6598,14 @@ return;
 
 error_log('AI Interview Widget: Voice TTS request for text: ' . substr($text, 0, 100) . '...');
 
-$audio_url = $this->generate_elevenlabs_speech($text);
+$tts_result = $this->generate_tts_speech($text);
 
-if ($audio_url) {
+if (!empty($tts_result['audio_url'])) {
 error_log('AI Interview Widget: TTS generation successful');
-wp_send_json_success(array('audio_url' => $audio_url));
+wp_send_json_success(array(
+    'audio_url' => $tts_result['audio_url'],
+    'source' => $tts_result['source']
+));
 } else {
 error_log('AI Interview Widget: TTS generation failed, will fallback to browser TTS');
 wp_send_json_error('TTS generation failed - will use browser fallback');
@@ -7186,6 +7453,8 @@ $widget_data = array_merge($widget_data, array(
 // VOICE SETTINGS - FIXED: These were missing!
 'voice_enabled' => get_option('ai_interview_widget_enable_voice', true),
 'has_elevenlabs_key' => !empty(get_option('ai_interview_widget_elevenlabs_api_key', '')),
+'tts_provider' => $this->get_active_tts_provider(),
+'has_tts_provider_key' => $this->has_configured_tts_provider_key(),
 'elevenlabs_voice_id' => get_option('ai_interview_widget_elevenlabs_voice_id', 'pNInz6obpgDQGcFmaJgB'),
 'voice_quality' => get_option('ai_interview_widget_voice_quality', 'eleven_multilingual_v2'),
 
@@ -7248,7 +7517,8 @@ echo '}' . "\n";
 echo '' . "\n";
 echo 'console.log("✅ Widget data ready:", window.aiWidgetData);' . "\n";
 echo 'console.log("🎤 Voice enabled:", window.aiWidgetData?.voice_enabled);' . "\n";
-echo 'console.log("🔑 Has ElevenLabs key:", window.aiWidgetData?.has_elevenlabs_key);' . "\n";
+echo 'console.log("🗣️ TTS provider:", window.aiWidgetData?.tts_provider);' . "\n";
+echo 'console.log("🔑 Has active TTS key:", window.aiWidgetData?.has_tts_provider_key);' . "\n";
 echo '</script>' . "\n";
 }, 25);
 }
@@ -7575,6 +7845,8 @@ $this->handle_direct_prompt_save();
 <?php
 $openai_key = get_option('ai_interview_widget_openai_api_key', '');
 $elevenlabs_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
+$openai_tts_key = get_option('ai_interview_widget_openai_tts_api_key', '');
+$tts_provider = $this->sanitize_tts_provider(get_option('ai_interview_widget_tts_provider', 'elevenlabs'));
 $voice_enabled = get_option('ai_interview_widget_enable_voice', true);
 $style_settings = get_option('ai_interview_widget_style_settings', '');
 $content_settings = get_option('ai_interview_widget_content_settings', '');
@@ -7598,9 +7870,15 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
         <?php if (!$voice_enabled): ?>
             <div style="color: #666; font-weight: bold;">🔇 Disabled</div>
             <p style="margin: 5px 0 0 0; color: #666;">Voice features are turned off</p>
+        <?php elseif ($tts_provider === 'openai' && empty($openai_tts_key)): ?>
+            <div style="color: #ffb900; font-weight: bold;">⚠️ Basic Mode</div>
+            <p style="margin: 5px 0 0 0; color: #666;">OpenAI TTS selected but API key is missing, using browser TTS fallback</p>
+        <?php elseif ($tts_provider === 'openai'): ?>
+            <div style="color: #46b450; font-weight: bold;">✅ Premium</div>
+            <p style="margin: 5px 0 0 0; color: #666;">OpenAI TTS active (model: <?php echo esc_html(get_option('ai_interview_widget_openai_tts_model', 'gpt-4o-mini-tts')); ?>)</p>
         <?php elseif (empty($elevenlabs_key)): ?>
             <div style="color: #ffb900; font-weight: bold;">⚠️ Basic Mode</div>
-            <p style="margin: 5px 0 0 0; color: #666;">Using browser TTS fallback</p>
+            <p style="margin: 5px 0 0 0; color: #666;">ElevenLabs selected without API key, using browser TTS fallback</p>
         <?php else: ?>
             <div style="color: #46b450; font-weight: bold;">✅ Premium</div>
             <p style="margin: 5px 0 0 0; color: #666;">ElevenLabs high-quality voice active</p>
@@ -7765,43 +8043,62 @@ $content_settings = get_option('ai_interview_widget_content_settings', '');
         </div>
     </div>
 
-    <!-- ElevenLabs Voice Configuration Container -->
+    <!-- Voice / TTS Configuration Container -->
     <div class="postbox aiw-settings-section" id="voice-settings-section" style="padding: 25px; margin-bottom: 20px; border-left: 4px solid #9C27B0; background: linear-gradient(135deg, #fafafa 0%, #f3e5f5 100%); box-shadow: 0 2px 8px rgba(156, 39, 176, 0.1);">
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
             <span style="font-size: 24px; margin-right: 12px; color: #9C27B0;">🎤</span>
-            <h3 style="margin: 0; color: #6A1B9A; font-size: 20px;">ElevenLabs Voice Configuration</h3>
+            <h3 style="margin: 0; color: #6A1B9A; font-size: 20px;">Voice / TTS Configuration</h3>
         </div>
         <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1bee7; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <?php
-            // Manually render ElevenLabs section
-            echo '<p style="margin: 0 0 15px 0; color: #666;">Configure ElevenLabs for high-quality text-to-speech. Get your API key from <a href="https://elevenlabs.io/speech-synthesis" target="_blank" style="color: #9C27B0;">ElevenLabs</a>. If not configured, browser TTS will be used as fallback.</p>';
+            echo '<p style="margin: 0 0 15px 0; color: #666;">Choose a TTS provider and configure provider-specific voice settings. If the selected provider is not configured, browser TTS fallback is used automatically.</p>';
             ?>
             <table class="form-table" role="presentation" style="margin: 0;">
                 <tr>
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">TTS Provider</th>
+                    <td><?php $this->tts_provider_field_callback(); ?></td>
+                </tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-openai">
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">OpenAI TTS API Key</th>
+                    <td><?php $this->openai_tts_api_key_field_callback(); ?></td>
+                </tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-openai">
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">OpenAI TTS Model</th>
+                    <td><?php $this->openai_tts_model_field_callback(); ?></td>
+                </tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-openai">
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">OpenAI Voice</th>
+                    <td><?php $this->openai_tts_voice_field_callback(); ?></td>
+                </tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-openai">
+                    <th scope="row" style="color: #6A1B9A; font-weight: 600;">OpenAI Output Format</th>
+                    <td><?php $this->openai_tts_format_field_callback(); ?></td>
+                </tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">ElevenLabs API Key</th>
                     <td><?php $this->elevenlabs_api_key_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Voice ID</th>
                     <td><?php $this->elevenlabs_voice_id_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Voice Model</th>
                     <td><?php $this->voice_quality_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Voice Speed</th>
                     <td><?php $this->elevenlabs_voice_speed_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Stability</th>
                     <td><?php $this->elevenlabs_stability_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Similarity Boost</th>
                     <td><?php $this->elevenlabs_similarity_field_callback(); ?></td>
                 </tr>
-                <tr>
+                <tr class="aiw-tts-provider-row aiw-tts-provider-elevenlabs">
                     <th scope="row" style="color: #6A1B9A; font-weight: 600;">Style Exaggeration</th>
                     <td><?php $this->elevenlabs_style_field_callback(); ?></td>
                 </tr>
@@ -8374,6 +8671,31 @@ public function elevenlabs_section_callback() {
 echo '<p>Configure ElevenLabs for high-quality text-to-speech. Get your API key from <a href="https://elevenlabs.io/speech-synthesis" target="_blank">ElevenLabs</a>. If not configured, browser TTS will be used as fallback.</p>';
 }
 
+private function get_openai_tts_voice_options() {
+    return array(
+        'alloy' => 'alloy',
+        'ash' => 'ash',
+        'coral' => 'coral',
+        'echo' => 'echo',
+        'fable' => 'fable',
+        'onyx' => 'onyx',
+        'nova' => 'nova',
+        'sage' => 'sage',
+        'shimmer' => 'shimmer'
+    );
+}
+
+public function tts_provider_field_callback() {
+    $tts_provider = $this->sanitize_tts_provider(get_option('ai_interview_widget_tts_provider', 'elevenlabs'));
+    ?>
+    <select id="tts_provider" name="ai_interview_widget_tts_provider">
+        <option value="elevenlabs" <?php selected($tts_provider, 'elevenlabs'); ?>>ElevenLabs (Current)</option>
+        <option value="openai" <?php selected($tts_provider, 'openai'); ?>>OpenAI TTS</option>
+    </select>
+    <p class="description">Choose which provider is used for server-side text-to-speech generation.</p>
+    <?php
+}
+
 public function elevenlabs_api_key_field_callback() {
 $api_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
 $masked_key = '';
@@ -8390,6 +8712,60 @@ if (!empty($api_key)) {
     <p class="description">Current key: <code><?php echo esc_html($masked_key); ?></code></p>
 <?php endif; ?>
 <p class="description">Optional: Enter your ElevenLabs API key for premium voice synthesis.</p>
+<?php
+}
+
+public function openai_tts_api_key_field_callback() {
+$api_key = get_option('ai_interview_widget_openai_tts_api_key', '');
+$masked_key = '';
+if (!empty($api_key)) {
+    $masked_key = substr($api_key, 0, 7) . str_repeat('*', max(0, strlen($api_key) - 11)) . substr($api_key, -4);
+}
+?>
+<input type="password" id="openai_tts_api_key" name="ai_interview_widget_openai_tts_api_key"
+       value="<?php echo esc_attr($api_key); ?>"
+       class="regular-text"
+       placeholder="sk-..."
+       autocomplete="new-password">
+<?php if (!empty($api_key)): ?>
+    <p class="description">Current key: <code><?php echo esc_html($masked_key); ?></code></p>
+<?php endif; ?>
+<p class="description">Required when OpenAI TTS provider is selected. This key is used only on the server and is never exposed to visitors.</p>
+<?php
+}
+
+public function openai_tts_model_field_callback() {
+$model = get_option('ai_interview_widget_openai_tts_model', 'gpt-4o-mini-tts');
+?>
+<select id="openai_tts_model" name="ai_interview_widget_openai_tts_model">
+    <option value="gpt-4o-mini-tts" <?php selected($model, 'gpt-4o-mini-tts'); ?>>gpt-4o-mini-tts (Recommended)</option>
+    <option value="gpt-4o-audio-preview" <?php selected($model, 'gpt-4o-audio-preview'); ?>>gpt-4o-audio-preview</option>
+</select>
+<p class="description">Set the OpenAI model used for TTS generation. Default is <code>gpt-4o-mini-tts</code>.</p>
+<?php
+}
+
+public function openai_tts_voice_field_callback() {
+$voice = $this->sanitize_openai_tts_voice(get_option('ai_interview_widget_openai_tts_voice', 'alloy'));
+$voices = $this->get_openai_tts_voice_options();
+?>
+<select id="openai_tts_voice" name="ai_interview_widget_openai_tts_voice">
+    <?php foreach ($voices as $value => $label): ?>
+        <option value="<?php echo esc_attr($value); ?>" <?php selected($voice, $value); ?>><?php echo esc_html($label); ?></option>
+    <?php endforeach; ?>
+</select>
+<p class="description">Choose the OpenAI TTS voice.</p>
+<?php
+}
+
+public function openai_tts_format_field_callback() {
+$format = $this->sanitize_openai_tts_format(get_option('ai_interview_widget_openai_tts_format', 'mp3'));
+?>
+<select id="openai_tts_format" name="ai_interview_widget_openai_tts_format">
+    <option value="mp3" <?php selected($format, 'mp3'); ?>>MP3 (Default)</option>
+    <option value="wav" <?php selected($format, 'wav'); ?>>WAV</option>
+</select>
+<p class="description">Audio format generated by OpenAI TTS.</p>
 <?php
 }
 
@@ -8480,7 +8856,7 @@ $voice_enabled = get_option('ai_interview_widget_enable_voice', true);
     <input type="checkbox" id="enable_voice" name="ai_interview_widget_enable_voice" value="1" <?php checked($voice_enabled); ?>>
     Enable voice input and text-to-speech features
 </label>
-<p class="description">Enables microphone input and voice responses. Uses ElevenLabs if configured, otherwise browser TTS.</p>
+<p class="description">Enables microphone input and voice responses. Uses the selected TTS provider when configured, otherwise browser TTS fallback.</p>
 <?php
 }
 
@@ -9012,6 +9388,8 @@ if ($response_code === 200) {
 public function test_voice_features() {
 $voice_enabled = get_option('ai_interview_widget_enable_voice', true);
 $elevenlabs_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
+$openai_tts_key = get_option('ai_interview_widget_openai_tts_api_key', '');
+$tts_provider = $this->get_active_tts_provider();
 
 if (!$voice_enabled) {
     add_settings_error('test_results', 'voice_test', '❌ Voice features are disabled in settings', 'error');
@@ -9021,7 +9399,13 @@ if (!$voice_enabled) {
 $features = array();
 $features[] = '🎤 Voice input: Browser Web Speech API';
 
-if (!empty($elevenlabs_key)) {
+if ($tts_provider === 'openai') {
+    if (!empty($openai_tts_key)) {
+        $features[] = '🔊 Voice output: OpenAI TTS (Premium)';
+    } else {
+        $features[] = '🔊 Voice output: Browser TTS (OpenAI TTS key missing)';
+    }
+} elseif (!empty($elevenlabs_key)) {
     $features[] = '🔊 Voice output: ElevenLabs TTS (Premium)';
 } else {
     $features[] = '🔊 Voice output: Browser TTS (Fallback)';
@@ -10365,23 +10749,34 @@ public function testing_page() {
             <?php endif; ?>
         </div>
 
-        <!-- ElevenLabs Status -->
+        <!-- Voice TTS Status -->
         <div class="postbox" style="padding: 20px;">
-            <h3 style="margin: 0 0 15px 0;">🎤 ElevenLabs Voice Status</h3>
+            <h3 style="margin: 0 0 15px 0;">🎤 Voice TTS Status</h3>
             <?php
             $elevenlabs_key = get_option('ai_interview_widget_elevenlabs_api_key', '');
+            $openai_tts_key = get_option('ai_interview_widget_openai_tts_api_key', '');
+            $tts_provider = $this->get_active_tts_provider();
             $voice_enabled = get_option('ai_interview_widget_enable_voice', true);
 
             if (!$voice_enabled):
             ?>
                 <div style="color: #666; font-weight: bold; margin-bottom: 10px;">🔇 Voice Disabled</div>
                 <p style="margin: 0; color: #666; font-size: 14px;">Voice features are turned off in settings.</p>
+            <?php elseif ($tts_provider === 'openai' && empty($openai_tts_key)): ?>
+                <div style="color: #ffb900; font-weight: bold; margin-bottom: 10px;">⚠️ Fallback Mode</div>
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">OpenAI TTS selected but key is missing. Using browser TTS fallback.</p>
+                <button onclick="testBrowserTTS()" class="button button-secondary">🔊 Test Browser TTS</button>
+            <?php elseif ($tts_provider === 'openai'): ?>
+                <div style="color: #46b450; font-weight: bold; margin-bottom: 10px;">✅ OpenAI TTS Ready</div>
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Provider: OpenAI | Model: <?php echo esc_html(get_option('ai_interview_widget_openai_tts_model', 'gpt-4o-mini-tts')); ?> | Voice: <?php echo esc_html(get_option('ai_interview_widget_openai_tts_voice', 'alloy')); ?></p>
+                <button onclick="testElevenLabs()" class="button button-secondary">🧪 Test TTS Endpoint</button>
+                <div id="elevenlabs-test-result" style="margin-top: 10px;"></div>
             <?php elseif (empty($elevenlabs_key)): ?>
                 <div style="color: #ffb900; font-weight: bold; margin-bottom: 10px;">⚠️ Fallback Mode</div>
-                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Using browser TTS. Configure ElevenLabs for premium quality.</p>
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">ElevenLabs selected without API key. Using browser TTS fallback.</p>
                 <button onclick="testBrowserTTS()" class="button button-secondary">🔊 Test Browser TTS</button>
             <?php else: ?>
-                <div style="color: #46b450; font-weight: bold; margin-bottom: 10px;">✅ Premium Voice Ready</div>
+                <div style="color: #46b450; font-weight: bold; margin-bottom: 10px;">✅ ElevenLabs Voice Ready</div>
                 <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">ElevenLabs API configured with voice ID: <?php echo substr(get_option('ai_interview_widget_elevenlabs_voice_id', 'pNInz6obpgDQGcFmaJgB'), 0, 8); ?>...</p>
                 <button onclick="testElevenLabs()" class="button button-primary">🧪 Test ElevenLabs</button>
                 <div id="elevenlabs-test-result" style="margin-top: 10px;"></div>
@@ -10538,7 +10933,7 @@ function testOpenAI() {
 }
 
 function testElevenLabs() {
-    logToConsole('Testing ElevenLabs TTS...');
+    logToConsole('Testing server TTS provider...');
 
     fetch(ajaxurl, {
         method: 'POST',
@@ -10547,7 +10942,7 @@ function testElevenLabs() {
         },
         body: new URLSearchParams({
             action: 'ai_interview_tts',
-            text: 'Hello, this is a test of ElevenLabs text-to-speech functionality.',
+            text: 'Hello, this is a test of text-to-speech functionality.',
             nonce: '<?php echo wp_create_nonce('ai_interview_nonce'); ?>'
         })
     })
@@ -10555,17 +10950,18 @@ function testElevenLabs() {
     .then(data => {
         const resultDiv = document.getElementById('elevenlabs-test-result');
         if (data.success && data.data.audio_url) {
-            resultDiv.innerHTML = '<div style="color: #46b450; font-weight: bold;">✅ Success!</div><audio controls style="width: 100%; margin-top: 5px;"><source src="' + data.data.audio_url + '" type="audio/mpeg"></audio>';
-            logToConsole('ElevenLabs TTS test successful', 'success');
+            const provider = data.data.source || 'server';
+            resultDiv.innerHTML = '<div style="color: #46b450; font-weight: bold;">✅ Success! (' + provider + ')</div><audio controls style="width: 100%; margin-top: 5px;" src="' + data.data.audio_url + '"></audio>';
+            logToConsole('Server TTS test successful (' + provider + ')', 'success');
         } else {
             resultDiv.innerHTML = '<div style="color: #dc3232; font-weight: bold;">❌ Failed</div><p style="font-size: 12px;">' + (data.data.message || 'Unknown error') + '</p>';
-            logToConsole('ElevenLabs TTS test failed', 'error');
+            logToConsole('Server TTS test failed', 'error');
         }
     })
     .catch(error => {
         const resultDiv = document.getElementById('elevenlabs-test-result');
         resultDiv.innerHTML = '<div style="color: #dc3232; font-weight: bold;">❌ Network Error</div>';
-        logToConsole('ElevenLabs TTS test network error: ' + error, 'error');
+        logToConsole('Server TTS test network error: ' + error, 'error');
     });
 }
 
@@ -10916,7 +11312,7 @@ public function documentation_page() {
     }
     
     /**
-     * AJAX handler for saving ElevenLabs Voice Configuration settings
+     * AJAX handler for saving Voice / TTS configuration settings.
      * 
      * @since 1.9.7
      */
@@ -10931,6 +11327,8 @@ public function documentation_page() {
         }
         
         // Get and sanitize voice settings
+        $tts_provider = isset($_POST['tts_provider']) ? $this->sanitize_tts_provider($_POST['tts_provider']) : 'elevenlabs';
+        $openai_tts_key_raw = isset($_POST['openai_tts_api_key']) ? trim(sanitize_text_field(wp_unslash($_POST['openai_tts_api_key']))) : '';
         $elevenlabs_key = isset($_POST['elevenlabs_api_key']) ? $this->sanitize_elevenlabs_api_key($_POST['elevenlabs_api_key']) : '';
         $voice_id = isset($_POST['elevenlabs_voice_id']) ? sanitize_text_field($_POST['elevenlabs_voice_id']) : '';
         $voice_quality = isset($_POST['voice_quality']) ? sanitize_text_field($_POST['voice_quality']) : '';
@@ -10938,12 +11336,30 @@ public function documentation_page() {
         $stability = isset($_POST['elevenlabs_stability']) ? $this->sanitize_elevenlabs_stability($_POST['elevenlabs_stability']) : 0.5;
         $similarity = isset($_POST['elevenlabs_similarity']) ? $this->sanitize_elevenlabs_similarity($_POST['elevenlabs_similarity']) : 0.8;
         $style = isset($_POST['elevenlabs_style']) ? $this->sanitize_elevenlabs_style($_POST['elevenlabs_style']) : 0.0;
+        $openai_tts_key = isset($_POST['openai_tts_api_key']) ? $this->sanitize_openai_tts_api_key($_POST['openai_tts_api_key']) : '';
+        $openai_tts_model = isset($_POST['openai_tts_model']) ? $this->sanitize_openai_tts_model($_POST['openai_tts_model']) : 'gpt-4o-mini-tts';
+        $openai_tts_voice = isset($_POST['openai_tts_voice']) ? $this->sanitize_openai_tts_voice($_POST['openai_tts_voice']) : 'alloy';
+        $openai_tts_format = isset($_POST['openai_tts_format']) ? $this->sanitize_openai_tts_format($_POST['openai_tts_format']) : 'mp3';
         $enable_voice = isset($_POST['enable_voice']) ? rest_sanitize_boolean($_POST['enable_voice']) : true;
         $disable_greeting = isset($_POST['disable_greeting_audio']) ? rest_sanitize_boolean($_POST['disable_greeting_audio']) : false;
         $disable_viz = isset($_POST['disable_audio_visualization']) ? rest_sanitize_boolean($_POST['disable_audio_visualization']) : false;
         $chatbox_only = isset($_POST['chatbox_only_mode']) ? rest_sanitize_boolean($_POST['chatbox_only_mode']) : false;
+
+        // Provider-specific validation
+        if ($tts_provider === 'openai') {
+            if (empty($openai_tts_key_raw)) {
+                wp_send_json_error(array('message' => 'OpenAI TTS API key is required when OpenAI TTS provider is selected.'));
+                return;
+            }
+
+            if (!$this->starts_with($openai_tts_key_raw, 'sk-') || strlen($openai_tts_key_raw) < 40) {
+                wp_send_json_error(array('message' => 'OpenAI TTS API key format is invalid. API keys should start with "sk-" and be at least 40 characters long.'));
+                return;
+            }
+        }
         
         // Update options
+        update_option('ai_interview_widget_tts_provider', $tts_provider);
         update_option('ai_interview_widget_elevenlabs_api_key', $elevenlabs_key);
         update_option('ai_interview_widget_elevenlabs_voice_id', $voice_id);
         update_option('ai_interview_widget_voice_quality', $voice_quality);
@@ -10951,13 +11367,18 @@ public function documentation_page() {
         update_option('ai_interview_widget_elevenlabs_stability', $stability);
         update_option('ai_interview_widget_elevenlabs_similarity', $similarity);
         update_option('ai_interview_widget_elevenlabs_style', $style);
+        update_option('ai_interview_widget_openai_tts_api_key', $openai_tts_key);
+        update_option('ai_interview_widget_openai_tts_model', $openai_tts_model);
+        update_option('ai_interview_widget_openai_tts_voice', $openai_tts_voice);
+        update_option('ai_interview_widget_openai_tts_format', $openai_tts_format);
         update_option('ai_interview_widget_enable_voice', $enable_voice);
         update_option('ai_interview_widget_disable_greeting_audio', $disable_greeting);
         update_option('ai_interview_widget_disable_audio_visualization', $disable_viz);
         update_option('ai_interview_widget_chatbox_only_mode', $chatbox_only);
         
         wp_send_json_success(array(
-            'message' => 'Voice settings saved successfully!'
+            'message' => 'Voice settings saved successfully!',
+            'tts_provider' => $tts_provider
         ));
     }
     
@@ -11044,12 +11465,19 @@ register_uninstall_hook(__FILE__, array('AIInterviewWidget', 'plugin_uninstall')
 // Add cleanup hook for old TTS files
 add_action('ai_interview_cleanup_tts_files', function() {
 $upload_dir = wp_upload_dir();
-$files = glob($upload_dir['path'] . '/ai_voice_tts_*.mp3');
+$tts_dir = $upload_dir['basedir'] . '/ai-interview-tts';
+$files = glob($tts_dir . '/ai_voice_tts_*.*');
 
-foreach ($files as $file) {
-if (file_exists($file) && (time() - filemtime($file)) > 3600) { // Delete files older than 1 hour
-    unlink($file);
-}
+if ($files) {
+    foreach ($files as $file) {
+        if (!preg_match('/\.(mp3|wav)$/', $file)) {
+            continue;
+        }
+
+        if (file_exists($file) && (time() - filemtime($file)) > 3600) { // Delete files older than 1 hour
+            unlink($file);
+        }
+    }
 }
 });
 ?>
